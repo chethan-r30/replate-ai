@@ -1,5 +1,6 @@
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
+import { aiRoutes } from './routes/ai.js';
 import { listingRoutes } from './routes/listings.js';
 import { claimRoutes } from './routes/claims.js';
 import { uploadRoutes } from './routes/uploads.js';
@@ -41,7 +42,7 @@ export function createApp(config) {
         next(new AppError(429, 'Too many requests')),
     }),
   );
-  app.use(express.json({ limit: '256kb' }));
+  app.use(express.json({ limit: '7mb' }));
   app.use(
     mongoSanitize({
       onSanitize: () => {
@@ -65,6 +66,7 @@ export function createApp(config) {
   app.use('/api/v1/listings', listingRoutes(config));
   app.use('/api/v1/claims', claimRoutes(config));
   app.use('/api/v1/uploads', uploadRoutes(config));
+  app.use('/api/v1/ai', aiRoutes(config));
   app.use(notFound);
   app.use(errorHandler);
   return app;

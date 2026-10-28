@@ -1,3 +1,5 @@
+import { recommendations, notifyMatches } from './services/matching.js';
+import { Notification } from './models/Notification.js';
 // Verify geo queries, ownership, deadline gates and concurrent claim handover.
 import {
   beforeAll,
@@ -330,5 +332,32 @@ describe('core domain', () => {
       ),
     );
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+  });
+  it('ranks geo candidates and notifies each NGO at most once', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const matches = await recommendations(listing);
+    expect(matches).toHaveLength(2);
+    expect(matches.every((x) => x.score > 0 && x.breakdown.pickup === 1)).toBe(
+      true,
+    );
+    expect(await notifyMatches(listing._id)).toBe(2);
+    expect(await notifyMatches(listing._id)).toBe(0);
+    expect(await Notification.countDocuments()).toBe(2);
+    expect(
+      (
+        await request(app)
+          .get(`/api/v1/ai/recommendations/${listing._id}`)
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(403);
+    const parsed = await request(app)
+      .post('/api/v1/ai/parse-listing')
+      .set('Authorization', restaurant.auth)
+      .send({ note: 'Bread' });
+    expect(parsed.status).toBe(200);
+    expect(parsed.body.data.mode).toBe('manual');
   });
 });

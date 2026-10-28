@@ -1,5 +1,6 @@
 // Expire listings without deleting history or claim evidence.
 import cron from 'node-cron';
+import { notifyMatches } from '../services/matching.js';
 import { FoodListing } from '../models/FoodListing.js';
 import { Claim } from '../models/Claim.js';
 import { logger } from '../lib/logger.js';
@@ -30,8 +31,24 @@ export async function expireListings() {
   );
   return expired.length;
 }
+export async function escalateMatches() {
+  const listings = await FoodListing.find({
+    status: 'available',
+    bestBefore: { $gt: new Date() },
+    $or: [
+      { lastNotifiedAt: { $lte: new Date(Date.now() - 900000) } },
+      { lastNotifiedAt: null },
+    ],
+  })
+    .select('_id')
+    .limit(100)
+    .lean();
+  for (const listing of listings) await notifyMatches(listing._id);
+}
 export function startExpiryJob() {
   return cron.schedule('* * * * *', () =>
-    expireListings().catch(() => logger.error('Expiry job failed')),
+    Promise.all([expireListings(), escalateMatches()]).catch(() =>
+      logger.error('Expiry job failed'),
+    ),
   );
 }
