@@ -77,6 +77,7 @@ try {
     })),
   );
   const claimUsers = [n, ...extraUsers];
+  const claimTokens = claimUsers.map((user) => signAccess(user, config));
   const now = Date.now();
   const docs = await FoodListing.insertMany(
     Array.from({ length: 200 }, (_, i) => ({
@@ -147,12 +148,12 @@ try {
           authorization: 'Bearer ' + signAccess(n, config),
         },
         setupRequest: (request) => {
-          const user = claimUsers[next];
+          const token = claimTokens[next];
           const listing = docs[next++];
           if (!listing) return null;
           request.headers = {
             ...request.headers,
-            authorization: 'Bearer ' + signAccess(user, config),
+            authorization: 'Bearer ' + token,
           };
           request.body = JSON.stringify({ listingId: String(listing._id) });
           return request;
