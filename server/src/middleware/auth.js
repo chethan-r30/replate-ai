@@ -34,7 +34,7 @@ const readClaimIdentity = batchRead(
           as: 'approvedNgos',
         },
       },
-    ]).option({ cursor: { batchSize: 1000 } }),
+    ]).option({ batchSize: 1000 }),
   (user) => user._id,
 );
 export const requireAuth = (config) =>
