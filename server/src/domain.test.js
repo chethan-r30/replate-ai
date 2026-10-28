@@ -994,4 +994,37 @@ describe('core domain', () => {
     expect(await Claim.countDocuments()).toBe(2);
     expect(await FoodListing.countDocuments({ status: 'available' })).toBe(2);
   });
+  it('overlapping transaction batches cannot reserve one listing for different ngos', async () => {
+    const listing = await post();
+    const first = createClaim(listing._id, ngo.org);
+    await new Promise((r) => setTimeout(r, 30));
+    const second = createClaim(listing._id, ngo2.org);
+    const results = await Promise.allSettled([first, second]);
+    expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    expect(await Claim.countDocuments()).toBe(1);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      1,
+    );
+  });
+  it('microbatch-generated claims and notices preserve timestamps and valid pickup codes', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    await Promise.all(listings.map((x) => createClaim(x._id, ngo.org)));
+    const claims = await Claim.find().select('+pickupCode');
+    const notices = await Notification.find({ type: 'claim-request' });
+    expect(
+      claims.every(
+        (x) => x.createdAt instanceof Date && /^\d{6}$/.test(x.pickupCode),
+      ),
+    ).toBe(true);
+    expect(
+      notices.every(
+        (x) =>
+          x._id &&
+          x.createdAt instanceof Date &&
+          String(x.user) === String(restaurant.user._id),
+      ),
+    ).toBe(true);
+  });
 });

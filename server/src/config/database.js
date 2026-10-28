@@ -6,6 +6,9 @@ export async function connectDatabase(uri) {
     maxPoolSize: 100,
     minPoolSize: 5,
   });
+  await Promise.all(
+    Object.values(mongoose.models).map((model) => model.init()),
+  );
 }
 export async function disconnectDatabase() {
   await mongoose.disconnect();

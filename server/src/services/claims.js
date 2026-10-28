@@ -158,6 +158,10 @@ let waiting = [];
 let scheduled = false;
 export function createClaim(listingId, ngo) {
   return new Promise((resolve, reject) => {
+    if (waiting.length >= 1000) {
+      reject(new AppError(503, 'Claim queue is busy; retry shortly'));
+      return;
+    }
     waiting.push({ listingId: String(listingId), ngo, resolve, reject });
     if (!scheduled) {
       scheduled = true;

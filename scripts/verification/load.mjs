@@ -130,6 +130,10 @@ try {
       mongoose.connection.db.command({ ping: 1 }),
     ),
   );
+  // Establish the already-used API connection pool before the measured mutation burst.
+  await fetch(url + '/api/v1/claims/mine', {
+    headers: { authorization: 'Bearer ' + signAccess(n, config) },
+  });
   const claim = await run({
     url,
     connections,

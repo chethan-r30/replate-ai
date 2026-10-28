@@ -11,6 +11,8 @@ await mongoose.connect(config.MONGODB_URI, {
   maxPoolSize: 200,
   monitorCommands: process.env.PROFILE_DB === '1',
 });
+// Readiness includes model/index initialization, not first-request DDL.
+await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
 const timings = {};
 if (process.env.PROFILE_DB === '1')
   mongoose.connection.getClient().on('commandSucceeded', (event) => {
