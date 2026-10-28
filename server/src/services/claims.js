@@ -156,12 +156,15 @@ mongoose.set('transactionAsyncLocalStorage', true);
 // until its transaction commits. A process crash loses only unanswered requests.
 let waiting = [];
 let scheduled = false;
+let writing = Promise.resolve();
+let outstanding = 0;
 export function createClaim(listingId, ngo) {
   return new Promise((resolve, reject) => {
-    if (waiting.length >= 1000) {
+    if (outstanding >= 1000) {
       reject(new AppError(503, 'Claim queue is busy; retry shortly'));
       return;
     }
+    outstanding += 1;
     waiting.push({ listingId: String(listingId), ngo, resolve, reject });
     if (!scheduled) {
       scheduled = true;
@@ -171,7 +174,9 @@ export function createClaim(listingId, ngo) {
         waiting = [];
         // Bound each transaction; overlapping chunks still use compare-and-swap.
         for (let offset = 0; offset < batch.length; offset += 200)
-          persistClaimBatch(batch.slice(offset, offset + 200));
+          writing = writing.then(() =>
+            persistClaimBatch(batch.slice(offset, offset + 200)),
+          );
       }, 25);
     }
   });
@@ -333,6 +338,8 @@ async function persistClaimBatch(batch) {
     );
   } catch (error) {
     batch.forEach((item) => item.reject(error));
+  } finally {
+    outstanding -= batch.length;
   }
 }
 export async function changeClaim(claimId, user, action, code) {
