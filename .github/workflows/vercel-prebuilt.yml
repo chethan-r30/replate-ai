@@ -6,9 +6,12 @@ on:
     types: [completed]
 permissions:
   contents: read
+concurrency:
+  group: replate-production-static
+  cancel-in-progress: false
 jobs:
   deploy:
-    # No build runtime upgrade. Enable only after storing a scoped Vercel token.
+    # No build runtime upgrade. Production environment holds a project-only token.
     if: ${{ vars.REPLATE_PREBUILT_DEPLOY_ENABLED == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment: production
@@ -26,6 +29,11 @@ jobs:
           VITE_API_URL: /api/v1
           VITE_SOCKET_URL: https://replate-api.onrender.com
           VITE_DEMO_MODE: 'true'
+      - name: Reject superseded release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: test "$(gh api repos/${{ github.repository }}/git/ref/heads/main --jq .object.sha)" = "$TESTED_SHA"
       - name: Deploy static output only
         run: npx --yes vercel@65.5.0 deploy --prebuilt --prod --yes --scope chethan-r30s-projects --project replate-ai --token "$VERCEL_TOKEN"
         env:
