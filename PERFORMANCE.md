@@ -44,3 +44,9 @@ A single-query user/organization join was tested to shorten one permission looku
 A100ms notification burst-coalescing experiment reduced local claim p95 only to1011ms, still above target. The in-memory queue was not retained: crash-safe notification delivery would need a durable outbox, and a small latency gain does not justify introducing a loss window. Existing immediate persistence behavior is preserved.
 
 A second CI artifact (run40723132113, commit da089ca) records runner topology:4 CPU cores,16.76GB RAM, Linux7.0 Azure, Node20.20.2, same single-node replica set and separate API/load processes. Search176.37ms p95, claim1508.38ms p95, zero failures,200 persisted claims. This also misses the target and contradicts a claim that more host cores/memory alone guarantee a fix. No infrastructure purchase is recommended from this evidence.
+
+## In-progress invariant-preserving microbatch redesign
+
+Overlapping permission reads are grouped for3ms, without retaining completed snapshots. Claim creation groups for10ms, at most200 requests per transaction, using bulk conditional reservations and generated claim records. Every response waits for commit. Notifications persist in the same transaction; websocket/email remain post-commit best effort. Mixed invalid requests reject individually; write failures roll back the whole transaction. Race/idempotency/multi-listing claim and notification-insert failure tests pass. A crashed process loses only unanswered queued requests, never acknowledges uncommitted state.
+
+This reduced local p95 from~1.1s to336ms; lean insertion of server-generated records with explicit timestamps then measured278.98ms with200 distinct claims,0 failures. This first below300ms local result is not final signoff: latest code must pass equivalent CI, coverage, failure tests and full browser flows. Earlier pre-lean microbatch CI run40724929128 measured393.96ms and is not represented as a pass.

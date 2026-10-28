@@ -966,4 +966,32 @@ describe('core domain', () => {
     expect(results.map((x) => x.status)).toEqual(['rejected', 'fulfilled']);
     expect(await Claim.countDocuments()).toBe(1);
   });
+  it('microbatch retries do not duplicate persisted notices and compare-swap failures roll back', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    await Promise.all(listings.map((x) => createClaim(x._id, ngo.org)));
+    const count = await Notification.countDocuments({ type: 'claim-request' });
+    await Promise.all(listings.map((x) => createClaim(x._id, ngo.org)));
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      count,
+    );
+    await createClaim(listings[0]._id, ngo.org);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      count,
+    );
+    const fresh = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    const update = vi
+      .spyOn(FoodListing, 'bulkWrite')
+      .mockResolvedValueOnce({ matchedCount: 1 });
+    const results = await Promise.allSettled(
+      fresh.map((x) => createClaim(x._id, ngo.org)),
+    );
+    update.mockRestore();
+    expect(results.every((x) => x.status === 'rejected')).toBe(true);
+    expect(await Claim.countDocuments()).toBe(2);
+    expect(await FoodListing.countDocuments({ status: 'available' })).toBe(2);
+  });
 });

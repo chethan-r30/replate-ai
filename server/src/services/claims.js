@@ -195,10 +195,14 @@ async function persistClaimBatch(batch) {
             user: owners.get(String(x.restaurant)),
             type: 'claim-request',
             message: 'A new food claim is waiting for your review.',
+            createdAt: new Date(),
+            updatedAt: new Date(),
           }));
         return {
           results,
-          notices: notices.length ? await Notification.insertMany(notices) : [],
+          notices: notices.length
+            ? await Notification.insertMany(notices, { lean: true })
+            : [],
         };
       }
       if (batch.length === 1) {
@@ -263,6 +267,8 @@ async function persistClaimBatch(batch) {
           restaurant: listing.restaurant,
           pickupCode: String(randomInt(100000, 1000000)),
           status: 'requested',
+          createdAt: now,
+          updatedAt: now,
         };
         pending.set(item.listingId, claim);
         claims.push(claim);
@@ -289,7 +295,8 @@ async function persistClaimBatch(batch) {
         const changed = await FoodListing.bulkWrite(updates);
         if (changed.matchedCount !== updates.length)
           throw new AppError(409, 'Reservation changed; retry');
-        await Claim.insertMany(claims);
+        // Values are generated here, not copied from caller input.
+        await Claim.insertMany(claims, { lean: true });
       }
       return persistNotices(results, new Set(claims.map((x) => String(x._id))));
     });
