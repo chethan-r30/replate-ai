@@ -18,3 +18,17 @@ it('deduplicates simultaneous session restore', async () => {
   await Promise.all([a, b]);
   expect(useAuth.getState().user.id).toBe('u');
 });
+it('logs in, logs out and clears failed restoration', async () => {
+  api.mockResolvedValueOnce({ accessToken: 'a', user: { id: 'new' } });
+  await useAuth
+    .getState()
+    .login({ email: 'demo@example.com', password: 'unused' });
+  expect(useAuth.getState().user.id).toBe('new');
+  api.mockResolvedValueOnce({});
+  await useAuth.getState().logout();
+  expect(useAuth.getState().user).toBeNull();
+  api.mockRejectedValueOnce(new Error('expired'));
+  await useAuth.getState().restore();
+  expect(useAuth.getState().loading).toBe(false);
+  expect(useAuth.getState().user).toBeNull();
+});

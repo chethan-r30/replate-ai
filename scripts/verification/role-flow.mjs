@@ -1,3 +1,5 @@
+import { strict as assert } from 'node:assert';
+import { readDevInbox } from '../../server/src/lib/mail.js';
 import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const require = createRequire(new URL('../../package.json', import.meta.url));
@@ -10,12 +12,7 @@ const root = new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 const { createApp } = await import(root + '/server/src/app.js');
 const { parseEnv } = await import(root + '/server/src/config/env.js');
 const { User } = await import(root + '/server/src/models/User.js');
-const { Organization } = await import(
-  root + '/server/src/models/Organization.js'
-);
-const { FoodListing } = await import(
-  root + '/server/src/models/FoodListing.js'
-);
+
 const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 await mongoose.connect(mongo.getUri());
 const config = parseEnv({
@@ -30,44 +27,13 @@ await mkdir(root + '/test-results', { recursive: true });
 let server, browser, web;
 try {
   const passwordHash = await bcrypt.hash('DemoVisual123!', 12);
-  const users = await User.create(
-    ['restaurant', 'ngo', 'admin'].map((role) => ({
-      name: `Demo ${role}`,
-      email: `${role}@demo.example`,
-      passwordHash,
-      role,
-      isEmailVerified: true,
-      verificationStatus: 'approved',
-    })),
-  );
-  const orgs = await Organization.create(
-    users.slice(0, 2).map((u) => ({
-      owner: u._id,
-      type: u.role,
-      name: `Demo ${u.role}`,
-      registrationNo: 'DEMO123',
-      address: '123 Demo Street',
-      timezone: 'Asia/Kolkata',
-      location: { type: 'Point', coordinates: [77.59, 12.97] },
-      verificationDocs: ['https://example.com/proof'],
-      verificationStatus: 'approved',
-      capacity: 100,
-    })),
-  );
-  await FoodListing.create({
-    restaurant: orgs[0]._id,
-    title: 'Fresh bakery boxes',
-    description: 'Demo listing for local visual verification only.',
-    category: 'bakery',
-    dietary: ['veg'],
-    quantity: 20,
-    unit: 'boxes',
-    servings: 20,
-    photos: [],
-    preparedAt: new Date(Date.now() - 3600000),
-    bestBefore: new Date(Date.now() + 7200000),
-    pickupWindow: { start: new Date(), end: new Date(Date.now() + 3600000) },
-    location: { type: 'Point', coordinates: [77.59, 12.97] },
+  await User.create({
+    name: 'Demo admin',
+    email: 'admin@demo.example',
+    passwordHash,
+    role: 'admin',
+    isEmailVerified: true,
+    verificationStatus: 'approved',
   });
   server = createApp(config).listen(5000);
   web = spawn(
@@ -91,7 +57,9 @@ try {
   }
   browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage({
-    viewport: { width: 1280, height: 900 },
+    viewport: process.env.MOBILE
+      ? { width: 390, height: 844 }
+      : { width: 1280, height: 900 },
   });
   const login = async (email) => {
     await page.goto('http://localhost:5173/login');
@@ -100,6 +68,67 @@ try {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.getByRole('heading', { name: 'Hello, Demo.' }).waitFor();
   };
+  for (const role of ['restaurant', 'ngo']) {
+    await page.goto('http://localhost:5173/register');
+    await page.getByLabel('Your name').fill(`Demo ${role}`);
+    await page
+      .getByLabel('Email', { exact: true })
+      .fill(`${role}@demo.example`);
+    await page.getByLabel('Password', { exact: true }).fill('DemoVisual123!');
+    await page.getByLabel('I am joining as').selectOption(role);
+    await page
+      .getByRole('button', { name: 'Create account', exact: true })
+      .click();
+    await page.getByText('Account created.', { exact: false }).waitFor();
+    const link = readDevInbox(`${role}@demo.example`).at(-1)?.url;
+    assert(link, 'Local verification inbox must contain a real generated link');
+    await page.goto(link);
+    await page
+      .getByRole('button', { name: 'Verify email', exact: true })
+      .click();
+    await page.getByText('Done. You can now sign in.').waitFor();
+    await login(`${role}@demo.example`);
+    await page
+      .getByRole('link', { name: 'Organization & preferences', exact: true })
+      .click();
+    const fields = {
+      'Organization name': `Demo ${role}`,
+      'Registration number': 'DEMO123',
+      Address: '123 Demo Street',
+      'IANA timezone': 'Asia/Kolkata',
+      Latitude: '12.97',
+      Longitude: '77.59',
+      'Daily meals capacity': '100',
+      'Proof document URL': 'https://example.com/proof',
+      'Opening hour (0-24)': '0',
+      'Closing hour (0-24)': '24',
+    };
+    for (const [label, value] of Object.entries(fields))
+      await page.getByLabel(label, { exact: true }).fill(value);
+    await page
+      .getByRole('button', { name: 'Submit for review', exact: true })
+      .click();
+    await page
+      .getByText('Submitted for admin review. Changes require reapproval.')
+      .waitFor();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await login('admin@demo.example');
+    const card = page.locator('article').filter({
+      has: page.getByRole('heading', {
+        name: `Demo ${role} · ${role} · pending`,
+        exact: true,
+      }),
+    });
+    await card.getByRole('button', { name: 'Approve', exact: true }).click();
+    await page
+      .getByRole('heading', {
+        name: `Demo ${role} · ${role} · approved`,
+        exact: true,
+      })
+      .waitFor();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    console.log(`${role} signup/email/organization/admin approval passed`);
+  }
   await login('restaurant@demo.example');
   await page.getByRole('link', { name: 'Post surplus', exact: true }).click();
   await page.getByLabel('Title', { exact: true }).fill('Smoke test bread');
@@ -147,7 +176,11 @@ try {
     await page.locator('strong.tracking-widest').textContent()
   ).trim();
   await page.screenshot({
-    path: root + '/test-results/replate-ngo-claim.png',
+    path:
+      root +
+      '/test-results/' +
+      (process.env.MOBILE ? 'mobile-' : 'desktop-') +
+      'replate-ngo-claim.png',
     fullPage: true,
   });
   console.log('NGO UI claim passed');
@@ -166,7 +199,11 @@ try {
     .waitFor();
   console.log('Restaurant UI verified pickup/history passed');
   await page.screenshot({
-    path: root + '/test-results/replate-completed-pickup.png',
+    path:
+      root +
+      '/test-results/' +
+      (process.env.MOBILE ? 'mobile-' : 'desktop-') +
+      'replate-completed-pickup.png',
     fullPage: true,
   });
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
@@ -180,7 +217,11 @@ try {
   if (await protectedAdmin.isEnabled())
     throw new Error('Admin disable unexpectedly enabled');
   await page.screenshot({
-    path: root + '/test-results/replate-admin.png',
+    path:
+      root +
+      '/test-results/' +
+      (process.env.MOBILE ? 'mobile-' : 'desktop-') +
+      'replate-admin.png',
     fullPage: true,
   });
   console.log('Admin UI dashboard passed');

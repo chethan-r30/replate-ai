@@ -83,7 +83,7 @@ export function organizationRoutes(config) {
     '/',
     requireRole('admin'),
     asyncRoute(async (req, res) => {
-      const { page, limit } = pagination.parse(req.query);
+      const { page, limit } = pagination.strict().parse(req.query);
       ok(
         res,
         await Organization.find()
@@ -98,6 +98,7 @@ export function organizationRoutes(config) {
     '/:id',
     asyncRoute(async (req, res) => {
       const id = objectId.parse(req.params.id);
+      z.object({}).strict().parse(req.query);
       const org = await Organization.findById(id).lean();
       if (!org) throw new AppError(404, 'Organization not found');
       if (
@@ -113,7 +114,11 @@ export function organizationRoutes(config) {
     requireRole('restaurant', 'ngo'),
     asyncRoute(async (req, res) => {
       const id = objectId.parse(req.params.id);
-      const data = organizationSchema.partial().parse(req.body);
+      // Zod defaults must not turn an empty PATCH into default-value writes.
+      const parsed = organizationSchema.partial().parse(req.body);
+      const data = Object.fromEntries(
+        Object.keys(req.body).map((key) => [key, parsed[key]]),
+      );
       if (Object.keys(data).length === 0)
         throw new AppError(400, 'No changes provided');
       const org = await Organization.findOneAndUpdate(

@@ -19,7 +19,9 @@
     "test:coverage": "vitest run --coverage",
     "build": "npm run build --workspaces --if-present",
     "prepare": "husky",
-    "check": "npm run lint && npm test && npm run build"
+    "check": "npm run lint && npm test && npm run build",
+    "test:e2e": "node scripts/verification/role-flow.mjs && MOBILE=1 node scripts/verification/role-flow.mjs",
+    "test:load": "node scripts/verification/load.mjs"
   },
   "lint-staged": {
     "*.{js,jsx}": [
@@ -34,6 +36,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@vitest/coverage-v8": "^5.0.5",
+    "autocannon": "^8.0.0",
     "concurrently": "^9.2.5",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -41,6 +44,7 @@
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
     "lint-staged": "^15.5.2",
+    "msw": "2.7.3",
     "prettier": "^3.9.10",
     "socket.io-client": "^4.8.4",
     "supertest": "^7.3.1",
