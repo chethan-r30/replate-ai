@@ -1,0 +1,67 @@
+name: Foundation checks
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint && npm run test:coverage && npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-evidence
+          path: |
+            coverage/
+            test-results/
+      - run: cp server/.env.example server/.env && cp client/.env.example client/.env
+      - run: docker compose config --quiet
+      - run: docker build -f server/Dockerfile -t replate-api .
+      - run: docker build -f client/Dockerfile -t replate-web .
+      - name: Verify container health and strict startup
+        run: |
+          docker run -d --name web -p 8080:8080 replate-web
+          for i in $(seq 1 30); do curl --fail http://localhost:8080 && break || sleep 1; done
+          test "$(docker inspect --format '{{.State.Running}}' web)" = true
+          docker network create replate-test
+          docker run -d --name mongo --network replate-test mongo:7 --replSet rs0 --bind_ip_all
+          for i in $(seq 1 30); do docker exec mongo mongosh --quiet --eval 'db.adminCommand("ping")' && break || sleep 1; done
+          docker exec mongo mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]})'
+          docker run -d --name api --network replate-test -p 5000:5000 -e CLIENT_URL=http://localhost:8080 -e MONGODB_URI=mongodb://mongo:27017/replate?replicaSet=rs0 -e JWT_ACCESS_SECRET=$(openssl rand -hex 48) -e JWT_REFRESH_SECRET=$(openssl rand -hex 48) -e NODE_ENV=development replate-api
+          for i in $(seq 1 60); do curl --fail http://localhost:5000/api/v1/ready && break || sleep 1; done
+          curl --fail http://localhost:5000/api/v1/ready
+      - if: failure()
+        run: docker logs api || true
+  load-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Enforce three independent disposable load trials
+        run: |
+          failed=0
+          for trial in 1 2 3; do
+            PROFILE_DB=1 npm run test:load || failed=1
+            cp test-results/load.json test-results/load-trial-$trial.json
+          done
+          test "$failed" = 0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-evidence
+          path: test-results/load*.json
