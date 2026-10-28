@@ -1,5 +1,5 @@
 // Coalesce overlapping live reads, never cache a completed permission snapshot.
-export function batchRead(fetchRows, keyOf, { delayMs = 3 } = {}) {
+export function batchRead(fetchRows, keyOf, { delayMs = 10 } = {}) {
   let queue = [];
   let timer;
   return (key) =>

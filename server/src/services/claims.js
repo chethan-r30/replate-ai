@@ -177,6 +177,7 @@ export function createClaim(listingId, ngo) {
   });
 }
 async function persistClaimBatch(batch) {
+  const startedAt = performance.now();
   try {
     const committed = await mongoose.connection.transaction(async () => {
       async function persistNotices(results, newIds) {
@@ -304,6 +305,10 @@ async function persistClaimBatch(batch) {
       }
       return persistNotices(results, new Set(claims.map((x) => String(x._id))));
     });
+    if (process.env.PROFILE_DB)
+      console.error(
+        `Claim batch size=${batch.length} committedMs=${(performance.now() - startedAt).toFixed(1)}`,
+      );
     const { results, notices } = committed;
     for (const notice of notices) {
       emitNotification(notice.user, {
