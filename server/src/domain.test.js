@@ -1108,4 +1108,25 @@ describe('core domain', () => {
     expect((await FoodListing.findById(listing._id)).status).toBe('available');
     spy.mockRestore();
   });
+  it('preserves claim live permission gates with a trailing slash', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const response = await callRoute('post', '/claims/')
+      .set('Authorization', ngo.auth)
+      .send({ listingId: String(listing._id) });
+    expect(response.status).toBe(201);
+    await Organization.updateOne(
+      { _id: ngo2.org._id },
+      { $set: { verificationStatus: 'rejected' } },
+    );
+    expect(
+      (
+        await callRoute('post', '/claims/')
+          .set('Authorization', ngo2.auth)
+          .send({ listingId: String(listing._id) })
+      ).status,
+    ).toBe(403);
+  });
 });

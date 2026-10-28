@@ -29,7 +29,7 @@ export const requireAuth = (config) =>
     const token = verifyToken(match[1], 'access', config);
     const claimCreate =
       req.method === 'POST' &&
-      req.originalUrl.split('?')[0] === '/api/v1/claims';
+      req.originalUrl.split('?')[0].replace(/\/$/, '') === '/api/v1/claims';
     const [user, ngo] = await Promise.all([
       readUser(token.sub),
       claimCreate ? readClaimNgo(token.sub) : Promise.resolve(null),
