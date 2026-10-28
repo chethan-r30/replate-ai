@@ -1,6 +1,7 @@
 // Lighthouse uses the built frontend and an ephemeral local API/database.
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
 import { chromium } from 'playwright';
 import lighthouse from 'lighthouse';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -44,6 +45,30 @@ try {
     args: ['--no-sandbox', '--remote-debugging-port=9222'],
   });
   await mkdir('test-results', { recursive: true });
+  const context = await browser.newContext();
+  const page = await context.newPage({ viewport: { width: 390, height: 844 } });
+  for (const path of ['/', '/listings', '/login', '/impact']) {
+    await page.goto('http://localhost:4173' + path);
+    await page.waitForTimeout(500);
+    const result = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .analyze();
+    if (result.violations.length)
+      throw new Error(
+        'Accessibility violations ' +
+          path +
+          ': ' +
+          JSON.stringify(
+            result.violations.map((x) => ({ id: x.id, impact: x.impact })),
+          ),
+      );
+  }
+  await page.screenshot({
+    path: 'test-results/phase7-mobile-impact.png',
+    fullPage: true,
+  });
+  await page.close();
+
   const scores = {};
   for (const path of ['/', '/listings', '/login', '/impact']) {
     const { lhr, report } = await lighthouse('http://localhost:4173' + path, {
