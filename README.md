@@ -4,7 +4,7 @@ A JavaScript MERN application in development for restaurants to share surplus fo
 
 ## Status
 
-Phases 0-6 are merged to develop with tested role flows. Phase 7 is in progress in PR9: frontend Lighthouse targets pass locally, but 200-connection claim latency still misses the below-300ms target. See [TEST_REPORT.md](TEST_REPORT.md), [PERFORMANCE.md](PERFORMANCE.md) and [docs/PROGRESS.md](docs/PROGRESS.md). Phases 8-10 and live deployment are not complete. No production-readiness claim.
+Phases0-8 are merged to develop with100tests,coverage,E2E,Docker and six independent below-target200-user load trials. Phase9 deployment is in progress. Vercel frontend is selected; Atlas login and Vercel updated terms need owner action, and Render Free scheduler/SMTP limits need an explicit plan. No live app or production-readiness claim. See [DEPLOYMENT.md](DEPLOYMENT.md),[SECURITY.md](SECURITY.md),[PERFORMANCE.md](PERFORMANCE.md) and [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ## Development
 

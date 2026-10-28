@@ -86,7 +86,14 @@ export function createApp(config) {
   );
   app.use(hpp());
   app.use(cookieParser());
-  app.use('/api/v1/auth', authRoutes(config));
+  app.use(
+    '/api/v1/auth',
+    (_req, res, next) => {
+      res.set('Cache-Control', 'private, no-store');
+      next();
+    },
+    authRoutes(config),
+  );
   app.use('/api/v1/organizations', organizationRoutes(config));
   app.get('/api/v1/health', (req, res) => {
     z.object({}).strict().parse(req.query);

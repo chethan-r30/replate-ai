@@ -285,6 +285,7 @@ export function authRoutes(config) {
     requireAuth(config),
     asyncRoute(async (req, res) => {
       z.object({}).strict().parse(req.query);
+      res.set('Cache-Control', 'private, no-store');
       ok(res, publicUser(req.user));
     }),
   );

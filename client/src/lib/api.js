@@ -1,8 +1,11 @@
 // Tokens stay in memory. Refresh uses the httpOnly cookie, never localStorage.
 import { z } from 'zod';
-const config = z.object({ VITE_API_URL: z.string().url() }).parse({
-  VITE_API_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
-});
+const config = z
+  .object({ VITE_API_URL: z.union([z.string().url(), z.literal('/api/v1')]) })
+  .parse({
+    VITE_API_URL:
+      import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  });
 let accessToken = null;
 let refreshing;
 export const getAccessToken = () => accessToken;
