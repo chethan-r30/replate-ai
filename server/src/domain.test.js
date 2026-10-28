@@ -988,7 +988,7 @@ describe('core domain', () => {
     );
     for (const model of [Claim, Notification]) {
       const spy = vi
-        .spyOn(model, 'insertMany')
+        .spyOn(model.collection, 'insertMany')
         .mockRejectedValueOnce(new Error('batch failed'));
       const results = await Promise.allSettled(
         listings.map((x) => createClaim(x._id, ngo.org)),

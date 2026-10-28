@@ -206,6 +206,7 @@ async function persistClaimBatch(batch) {
         const notices = unique
           .filter((x) => owners.has(String(x.restaurant)))
           .map((x) => ({
+            _id: new mongoose.Types.ObjectId(),
             user: owners.get(String(x.restaurant)),
             type: 'claim-request',
             message: 'A new food claim is waiting for your review.',
@@ -215,7 +216,9 @@ async function persistClaimBatch(batch) {
         return {
           results,
           notices: notices.length
-            ? await Notification.insertMany(notices, { lean: true })
+            ? await Notification.collection
+                .insertMany(notices, { session })
+                .then(() => notices)
             : [],
         };
       }
@@ -333,7 +336,7 @@ async function persistClaimBatch(batch) {
         if (changed.matchedCount !== updates.length)
           throw new AppError(409, 'Reservation changed; retry');
         // Values are generated here, not copied from caller input.
-        await Claim.insertMany(claims, { lean: true });
+        await Claim.collection.insertMany(claims, { session });
       }
       return persistNotices(results, new Set(claims.map((x) => String(x._id))));
     });
