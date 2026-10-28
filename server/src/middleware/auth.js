@@ -1,3 +1,4 @@
+import { profile } from '../lib/profile.js';
 // Re-read user status for every request so role changes and deletion take effect.
 import { batchRead } from '../services/read-batch.js';
 import { z } from 'zod';
@@ -14,9 +15,11 @@ export const requireAuth = (config) =>
       req.headers.authorization || '',
     );
     if (!match) throw new AppError(401, 'Sign in required');
+    const authStart = performance.now();
     const token = verifyToken(match[1], 'access', config);
     const user = await readUser(token.sub);
     if (!user) throw new AppError(401, 'Sign in required');
+    profile('auth', performance.now() - authStart);
     req.user = user;
     next();
   });

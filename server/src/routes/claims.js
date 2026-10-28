@@ -1,3 +1,4 @@
+import { profile } from '../lib/profile.js';
 import { trackBackground } from '../services/background.js';
 // Only approved NGOs claim; only the restaurant confirms the NGO's pickup code.
 import { batchRead } from '../services/read-batch.js';
@@ -59,9 +60,13 @@ export function claimRoutes(config) {
         .object({ listingId: objectId })
         .strict()
         .parse(req.body);
+      const ngoStart = performance.now();
       const ngo = await readNgo(req.user._id);
+      profile('ngo-read', performance.now() - ngoStart);
       if (!ngo) throw new AppError(403, 'Approved NGO required');
+      const queueStart = performance.now();
       const claim = await createClaim(listingId, ngo);
+      profile('claim-queue-through-commit', performance.now() - queueStart);
       ok(res, claim, 201);
     }),
   );

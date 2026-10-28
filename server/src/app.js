@@ -1,3 +1,4 @@
+import { profile } from './lib/profile.js';
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
 import {
@@ -25,6 +26,15 @@ import { databaseReady } from './config/database.js';
 import { AppError, errorHandler, notFound, ok } from './middleware/errors.js';
 export function createApp(config) {
   const app = express();
+  if (process.env.PROFILE_DB)
+    app.use((req, res, next) => {
+      req.profileStart = performance.now();
+      if (req.method === 'POST' && req.path === '/api/v1/claims')
+        res.once('finish', () =>
+          profile('claim-total', performance.now() - req.profileStart),
+        );
+      next();
+    });
   app.disable('x-powered-by');
   app.set('trust proxy', config.NODE_ENV === 'production' ? 1 : false);
   app.use(
