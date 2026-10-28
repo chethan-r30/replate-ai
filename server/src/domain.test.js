@@ -1027,4 +1027,36 @@ describe('core domain', () => {
       ),
     ).toBe(true);
   });
+  it('queued claims cannot bypass the live role and organization gates after revocation', async () => {
+    const listing = await post();
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { verificationStatus: 'rejected' } },
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/claims')
+          .set('Authorization', ngo.auth)
+          .send({ listingId: listing._id })
+      ).status,
+    ).toBe(403);
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { verificationStatus: 'approved' } },
+    );
+    await Organization.updateOne(
+      { _id: ngo.org._id },
+      { $set: { verificationStatus: 'rejected' } },
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/claims')
+          .set('Authorization', ngo.auth)
+          .send({ listingId: listing._id })
+      ).status,
+    ).toBe(403);
+    expect(await Claim.countDocuments()).toBe(0);
+  });
 });
