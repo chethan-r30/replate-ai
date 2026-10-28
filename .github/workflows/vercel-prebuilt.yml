@@ -35,7 +35,7 @@ jobs:
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: test "$(gh api repos/${{ github.repository }}/git/ref/heads/main --jq .object.sha)" = "$TESTED_SHA"
       - name: Deploy static output only
-        run: npx --yes vercel@65.5.0 deploy --prebuilt --prod --yes --scope chethan-r30s-projects --project replate-ai --token "$VERCEL_TOKEN"
+        run: npx --yes vercel@65.5.0 deploy --prebuilt --prod --yes --token "$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: team_93k0oAoRqyU0cp8GicAOiDR7
