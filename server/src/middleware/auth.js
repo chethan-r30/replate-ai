@@ -1,8 +1,13 @@
 // Re-read user status for every request so role changes and deletion take effect.
+import { batchRead } from '../services/read-batch.js';
 import { z } from 'zod';
 import { verifyToken } from '../lib/tokens.js';
 import { User } from '../models/User.js';
 import { AppError, asyncRoute } from './errors.js';
+const readUser = batchRead(
+  (ids) => User.find({ _id: { $in: ids }, deletedAt: null }).lean(),
+  (user) => user._id,
+);
 export const requireAuth = (config) =>
   asyncRoute(async (req, _res, next) => {
     const match = /^Bearer ([A-Za-z0-9_.-]+)$/.exec(
@@ -10,7 +15,7 @@ export const requireAuth = (config) =>
     );
     if (!match) throw new AppError(401, 'Sign in required');
     const token = verifyToken(match[1], 'access', config);
-    const user = await User.findOne({ _id: token.sub, deletedAt: null });
+    const user = await readUser(token.sub);
     if (!user) throw new AppError(401, 'Sign in required');
     req.user = user;
     next();

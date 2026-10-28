@@ -1,5 +1,9 @@
 // Production entrypoint requires valid configuration and a reachable database.
 import 'dotenv/config';
+import {
+  configureSharedCache,
+  closeSharedCache,
+} from './services/shared-cache.js';
 import { configureNotifications } from './services/notifications.js';
 import { startRealtime } from './services/realtime.js';
 import { startExpiryJob } from './jobs/expiry.js';
@@ -9,6 +13,7 @@ import { createApp } from './app.js';
 import { logger } from './lib/logger.js';
 export async function start(config) {
   configureNotifications(config);
+  await configureSharedCache(config.REDIS_URL);
   await connectDatabase(config.MONGODB_URI);
   const expiryJob = startExpiryJob();
   const server = createApp(config).listen(config.PORT, '0.0.0.0', () =>
@@ -20,6 +25,7 @@ export async function start(config) {
       server.close(async () => {
         expiryJob.stop();
         io.close();
+        await closeSharedCache();
         await disconnectDatabase();
         process.exit(0);
       }),

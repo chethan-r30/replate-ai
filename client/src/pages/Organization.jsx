@@ -151,7 +151,7 @@ export default function OrganizationPage() {
             )}
           </label>
         ))}
-        <p className="text-sm text-stone-500 sm:col-span-2">
+        <p className="text-sm text-stone-600 dark:text-stone-400 sm:col-span-2">
           Categories: cooked, bakery, produce, packaged, dairy. Tags: veg,
           vegan, halal, contains-nuts. Upload image proof through the upload
           service when configured, or provide your hosted document URL. Proof is

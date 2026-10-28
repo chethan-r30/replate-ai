@@ -1,10 +1,19 @@
 // React client with a local API proxy for development.
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   plugins: [
     react(),
+    ...(process.env.ANALYZE
+      ? [
+          visualizer({
+            filename: '../test-results/bundle.html',
+            gzipSize: true,
+          }),
+        ]
+      : []),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['icon.svg'],

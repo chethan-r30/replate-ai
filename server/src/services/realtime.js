@@ -1,5 +1,6 @@
 // Authenticate sockets and publish only to the signed-in user's private room.
 import { Server } from 'socket.io';
+import { coalesceEvents } from './coalesce-events.js';
 import { verifyToken } from '../lib/tokens.js';
 import { User } from '../models/User.js';
 let io;
@@ -30,5 +31,9 @@ export function startRealtime(server, config) {
   });
   return io;
 }
-export const emitNotification = (userId, data) =>
-  io?.to(String(userId)).emit('notification', data);
+const emitHint = coalesceEvents((userId, data) =>
+  io?.to(userId).emit('notification', data),
+);
+export const emitNotification = (userId, data) => {
+  if (io) emitHint(String(userId), data);
+};

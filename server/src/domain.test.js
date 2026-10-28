@@ -1,3 +1,5 @@
+import { drainBackground } from './services/background.js';
+import { clearCache } from './services/cache.js';
 import { recommendations, notifyMatches } from './services/matching.js';
 import { SurplusHistory } from './models/SurplusHistory.js';
 import { Notification } from './models/Notification.js';
@@ -6,6 +8,7 @@ import {
   beforeAll,
   afterAll,
   beforeEach,
+  afterEach,
   describe,
   it,
   expect,
@@ -22,6 +25,7 @@ import { FoodListing } from './models/FoodListing.js';
 import { Claim } from './models/Claim.js';
 import { signAccess } from './lib/tokens.js';
 import { expireListings } from './jobs/expiry.js';
+import { createClaim } from './services/claims.js';
 import { canTransition } from './services/claims.js';
 const config = parseEnv({
   NODE_ENV: 'test',
@@ -96,7 +100,11 @@ afterAll(async () => {
   await mongoose.disconnect();
   await mongo.stop();
 });
+afterEach(async () => {
+  await drainBackground();
+});
 beforeEach(async () => {
+  clearCache();
   await Promise.all(
     Object.values(mongoose.connection.collections).map((c) => c.deleteMany({})),
   );
@@ -374,6 +382,7 @@ describe('core domain', () => {
       {},
       { $set: { status: 'picked_up', unit: 'kg', quantity: 2 } },
     );
+    clearCache();
     const impact = await request(app).get('/api/v1/analytics/public');
     expect(impact.body.data.mealsSaved).toBe(10);
     expect(impact.body.data.kgSaved).toBe(2);
@@ -905,5 +914,154 @@ describe('core domain', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].quantityPosted).toBe(25);
     expect(rows[0].category).toBe('produce');
+  });
+  it('microbatches distinct claims and races without duplicating reservations', async () => {
+    const [a, b] = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    const results = await Promise.allSettled([
+      createClaim(a._id, ngo.org),
+      createClaim(a._id, ngo.org),
+      createClaim(a._id, ngo2.org),
+      createClaim(b._id, ngo2.org),
+    ]);
+    expect(results.map((x) => x.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'rejected',
+      'fulfilled',
+    ]);
+    expect(String(results[0].value._id)).toBe(String(results[1].value._id));
+    expect(await Claim.countDocuments()).toBe(2);
+    expect(await FoodListing.countDocuments({ status: 'reserved' })).toBe(2);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      2,
+    );
+  });
+  it('rolls back an entire multi-listing batch if claim or notice persistence fails', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    for (const model of [Claim, Notification]) {
+      const spy = vi
+        .spyOn(model, 'insertMany')
+        .mockRejectedValueOnce(new Error('batch failed'));
+      const results = await Promise.allSettled(
+        listings.map((x) => createClaim(x._id, ngo.org)),
+      );
+      spy.mockRestore();
+      expect(results.every((x) => x.status === 'rejected')).toBe(true);
+      expect(await Claim.countDocuments()).toBe(0);
+      expect(await FoodListing.countDocuments({ status: 'available' })).toBe(2);
+      expect(await Notification.countDocuments()).toBe(0);
+    }
+  });
+  it('mixed batch errors do not reject unrelated valid claims or bypass deadlines', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    await FoodListing.updateOne(
+      { _id: listings[0]._id },
+      { $set: { bestBefore: new Date(0) } },
+    );
+    const results = await Promise.allSettled([
+      createClaim(listings[0]._id, ngo.org),
+      createClaim(listings[1]._id, ngo.org),
+    ]);
+    expect(results.map((x) => x.status)).toEqual(['rejected', 'fulfilled']);
+    expect(await Claim.countDocuments()).toBe(1);
+  });
+  it('microbatch retries do not duplicate persisted notices and compare-swap failures roll back', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    await Promise.all(listings.map((x) => createClaim(x._id, ngo.org)));
+    const count = await Notification.countDocuments({ type: 'claim-request' });
+    await Promise.all(listings.map((x) => createClaim(x._id, ngo.org)));
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      count,
+    );
+    await createClaim(listings[0]._id, ngo.org);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      count,
+    );
+    const fresh = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    const update = vi
+      .spyOn(FoodListing, 'bulkWrite')
+      .mockResolvedValueOnce({ matchedCount: 1 });
+    const results = await Promise.allSettled(
+      fresh.map((x) => createClaim(x._id, ngo.org)),
+    );
+    update.mockRestore();
+    expect(results.every((x) => x.status === 'rejected')).toBe(true);
+    expect(await Claim.countDocuments()).toBe(2);
+    expect(await FoodListing.countDocuments({ status: 'available' })).toBe(2);
+  });
+  it('overlapping transaction batches cannot reserve one listing for different ngos', async () => {
+    const listing = await post();
+    const first = createClaim(listing._id, ngo.org);
+    await new Promise((r) => setTimeout(r, 30));
+    const second = createClaim(listing._id, ngo2.org);
+    const results = await Promise.allSettled([first, second]);
+    expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    expect(await Claim.countDocuments()).toBe(1);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      1,
+    );
+  });
+  it('microbatch-generated claims and notices preserve timestamps and valid pickup codes', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    await Promise.all(listings.map((x) => createClaim(x._id, ngo.org)));
+    const claims = await Claim.find().select('+pickupCode');
+    const notices = await Notification.find({ type: 'claim-request' });
+    expect(
+      claims.every(
+        (x) => x.createdAt instanceof Date && /^\d{6}$/.test(x.pickupCode),
+      ),
+    ).toBe(true);
+    expect(
+      notices.every(
+        (x) =>
+          x._id &&
+          x.createdAt instanceof Date &&
+          String(x.user) === String(restaurant.user._id),
+      ),
+    ).toBe(true);
+  });
+  it('queued claims cannot bypass the live role and organization gates after revocation', async () => {
+    const listing = await post();
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { verificationStatus: 'rejected' } },
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/claims')
+          .set('Authorization', ngo.auth)
+          .send({ listingId: listing._id })
+      ).status,
+    ).toBe(403);
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { verificationStatus: 'approved' } },
+    );
+    await Organization.updateOne(
+      { _id: ngo.org._id },
+      { $set: { verificationStatus: 'rejected' } },
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/claims')
+          .set('Authorization', ngo.auth)
+          .send({ listingId: listing._id })
+      ).status,
+    ).toBe(403);
+    expect(await Claim.countDocuments()).toBe(0);
   });
 });

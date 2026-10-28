@@ -49,7 +49,7 @@ function Home() {
               Find food nearby
             </Link>
           </div>
-          <p className="mt-5 text-sm text-stone-500 dark:text-stone-400">
+          <p className="mt-5 text-sm text-stone-600 dark:text-stone-400 dark:text-stone-400">
             Made for restaurants, NGOs and the people between.
           </p>
         </div>
@@ -118,7 +118,9 @@ function Home() {
               key={n}
               className="rounded-2xl border border-stone-200 p-6 dark:border-stone-700"
             >
-              <span className="text-sm text-stone-500">{n}</span>
+              <span className="text-sm text-stone-600 dark:text-stone-400">
+                {n}
+              </span>
               <h3 className="mt-6 text-xl font-semibold">{title}</h3>
               <p className="mt-2 leading-relaxed text-stone-600 dark:text-stone-300">
                 {text}
@@ -170,7 +172,9 @@ export default function App() {
             >
               <Leaf className="text-forest dark:text-leaf" />
               replate
-              <span className="text-sm font-normal text-stone-500">AI</span>
+              <span className="text-sm font-normal text-stone-600 dark:text-stone-400">
+                AI
+              </span>
             </Link>
             <div className="flex items-center gap-4 text-sm">
               <NavLink to="/listings">Explore food</NavLink>
@@ -272,7 +276,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </main>
-        <footer className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 border-t border-stone-200 px-5 py-7 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">
+        <footer className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 border-t border-stone-200 px-5 py-7 text-sm text-stone-600 dark:text-stone-400 dark:border-stone-700 dark:text-stone-400">
           <span>ReplateAI · Good food belongs on a table.</span>
           <span>Development preview · Not a live food service</span>
         </footer>

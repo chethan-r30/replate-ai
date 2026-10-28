@@ -21,7 +21,9 @@
     "prepare": "husky",
     "check": "npm run lint && npm test && npm run build",
     "test:e2e": "node scripts/verification/role-flow.mjs && MOBILE=1 node scripts/verification/role-flow.mjs",
-    "test:load": "node scripts/verification/load.mjs"
+    "test:load": "node scripts/verification/load.mjs",
+    "test:lighthouse": "node scripts/verification/performance.mjs",
+    "analyze": "ANALYZE=1 npm run build -w client"
   },
   "lint-staged": {
     "*.{js,jsx}": [
@@ -31,6 +33,7 @@
     "*.{json,md,yml,yaml,css}": "prettier --write"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^7.0.1",
@@ -43,9 +46,11 @@
     "globals": "^17.13.0",
     "husky": "^9.1.7",
     "jsdom": "^26.1.0",
+    "lighthouse": "^13.6.0",
     "lint-staged": "^15.5.2",
     "msw": "2.7.3",
     "prettier": "^3.9.10",
+    "rollup-plugin-visualizer": "^7.1.1",
     "socket.io-client": "^4.8.4",
     "supertest": "^7.3.1",
     "vitest": "^5.0.5"

@@ -1,11 +1,18 @@
 // Food safety deadlines stay visible before a user chooses to claim.
+import { imageUrl } from '../lib/images.js';
 import { Link } from 'react-router-dom';
 export default function ListingCard({ listing }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-900">
       {listing.photos?.[0] && (
         <img
-          src={listing.photos[0]}
+          src={imageUrl(listing.photos[0])}
+          srcSet={[320, 640, 960]
+            .map((w) => `${imageUrl(listing.photos[0], w)} ${w}w`)
+            .join(',')}
+          sizes="(max-width: 768px) 100vw, 33vw"
+          width="640"
+          height="360"
           alt={listing.title}
           loading="lazy"
           className="h-44 w-full object-cover"
