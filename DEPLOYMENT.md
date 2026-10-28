@@ -90,3 +90,11 @@ Before a rollback, inspect database compatibility: code rollback does not undo c
 ## Still pending
 
 Owner Vercel notice review, Google/Atlas access, verified database/network setup, hosting plan/scheduler/email decision, service creation, real origin proxy configuration, release to main, live smoke/browser pickup flow and final docs. No live URLs or production-ready claim yet.
+
+### Provisioning checkpoint (2026-10-28)
+
+A separate Atlas project ReplateAI was created, leaving existing unrelated projects unchanged. The ReplateAI cluster uses the explicitly selected Free tier ($0/hour), AWS Mumbai, no auto-scaling, no sample dataset and no automated security/user creation. No database credential or allowlist was created yet; database-scoped readWrite on the replate database and explicit hosting egress addresses are still required. No broad atlasAdmin quickstart user is needed.
+
+The user approved acknowledgement of Vercel's updated terms/privacy notice with optional model training/data sharing off. The toggle was set off and the dashboard confirmed "Opted out". The existing Vercel GitHub App was granted access only to this additional repository, retaining the pre-existing selection. Its separate permission-upgrade request was not approved. Import now recognizes replate-ai, but no deployment/project creation has been submitted. The import defaults to main, which is still bootstrap; do not deploy it until the checked release is merged.
+
+Latest CI performance regressions reopen the release gate despite earlier passes. See PERFORMANCE.md. Real API origin, database-scoped credentials/allowlist, working external email/image credentials and live smoke/demo remain outstanding. The Free Render scheduler/sleep/SMTP limitations described above remain unresolved; no paid plan was authorized.
