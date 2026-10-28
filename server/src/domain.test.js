@@ -990,7 +990,7 @@ describe('core domain', () => {
       [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
     );
     const update = vi
-      .spyOn(FoodListing, 'bulkWrite')
+      .spyOn(FoodListing.collection, 'bulkWrite')
       .mockResolvedValueOnce({ matchedCount: 1 });
     const results = await Promise.allSettled(
       fresh.map((x) => createClaim(x._id, ngo.org)),

@@ -183,7 +183,7 @@ export function createClaim(listingId, ngo) {
 async function persistClaimBatch(batch) {
   const startedAt = performance.now();
   try {
-    const committed = await mongoose.connection.transaction(async () => {
+    const committed = await mongoose.connection.transaction(async (session) => {
       async function persistNotices(results, newIds) {
         const unique = [
           ...new Map(
@@ -300,13 +300,18 @@ async function persistClaimBatch(batch) {
                 status: 'reserved',
                 reservedBy: item.ngo._id,
                 activeClaim: claim._id,
+                updatedAt: now,
               },
             },
           },
         });
       }
       if (updates.length) {
-        const changed = await FoodListing.bulkWrite(updates);
+        // These updates contain only server-generated IDs, states and dates.
+        // Supply the session explicitly because the native collection bypasses ODM casting.
+        const changed = await FoodListing.collection.bulkWrite(updates, {
+          session,
+        });
         if (changed.matchedCount !== updates.length)
           throw new AppError(409, 'Reservation changed; retry');
         // Values are generated here, not copied from caller input.
