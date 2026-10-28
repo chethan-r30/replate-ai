@@ -43,3 +43,5 @@ Performance optimization, full security hardening, CI results for this phase, re
 ## Phase8 regression evidence
 
 98 tests pass with configured coverage thresholds, including password-confirmed account erasure, old-session rejection, active-handover/admin deletion guards, deletion-write rollback, production HTTPS/Origin/CSP/HSTS and audit-write failure rollback for approval/disable/moderation. SECURITY.md lists the scope and remaining deployment/retention limits.
+
+Latest Phase8 scope:100 tests pass. Added cache-miss single-flight/invalidation regression and trailing-slash claim permission regression. Services thresholds80% and client70% remain enforced. Repeatable200-user load: three independent disposable trials claims203.82/193.92/225.61ms,search86.73/92.32/89.28ms,0errors/200correct each in40730689271. Every trial must pass. Full external production latency remains unverified.

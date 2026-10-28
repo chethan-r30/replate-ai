@@ -1,6 +1,6 @@
 # Performance evidence and open gate
 
-Measured 2026-10-28. Performance gate REOPENED after postmerge313.59ms and Phase8 CI467.92ms claim p95 failures. Earlier239.88ms/260.50ms passes are valid measurements, not proof of reliable headroom. Do not mark optimization or Phase8 complete until corrected-head full gates pass repeatably.
+Measured 2026-10-28. Latest corrected-head three-trial CI40730689271 meets the performance target: claim p95=203.82/193.92/225.61ms and search86.73/92.32/89.28ms,0errors,200distinct NGO claims/reservations each. Earlier postmerge failures below are retained. Full exact-head security CI must finish before Phase8 merge.
 
 ## Frontend
 
@@ -76,3 +76,7 @@ Stage instrumentation local shows auth66-105ms p95 and queue-through-commit122-1
 CI40730183077 search159.47ms but claim309.14ms,0errors/200distinct; still fails. Single-flight search retained because it removes measured duplicate DB work, not because it solves everything. Next targeted improvement performs live user and approved-NGO reads concurrently for claim creation, rather than two sequential coalescing waits. Both results are new DB reads; role/verification checks still run before claim writes and missing/revoked NGO rejects. No completed permission cache.
 
 Live user/NGO reads now overlap while requiring both current results. Local claim220.83ms/search127.78ms,99tests+full E2E pass. The CI gate now runs three independent disposable trials sequentially and fails if ANY trial misses; artifacts retain each trial. This tests repeatable headroom instead of selecting a passing runner. No workload, count, precision or threshold is relaxed.
+
+## Repeatability checkpoint
+
+Corrected live-read concurrency plus public single-flight cache: https://github.com/chethan-r30/replate-ai/actions/runs/40730689271 . Three independently seeded disposable replica sets, same200-distinct-user workload, all below300ms and zero errors: claims203.82/193.92/225.61ms;search86.73/92.32/89.28ms. Previous corrected-head full CI40730475647 also passed with claim245.54ms/search123.12ms. The load job fails if ANY trial misses, retaining every artifact. These are same-host runner measurements, not a production SLA or proof that multi-instance/remote Atlas latency will match. No write durability, permission freshness or count checks were weakened.
