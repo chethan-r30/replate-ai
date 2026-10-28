@@ -23,6 +23,7 @@ import { FoodListing } from './models/FoodListing.js';
 import { Claim } from './models/Claim.js';
 import { signAccess } from './lib/tokens.js';
 import { expireListings } from './jobs/expiry.js';
+import { createClaim } from './services/claims.js';
 import { canTransition } from './services/claims.js';
 const config = parseEnv({
   NODE_ENV: 'test',
@@ -908,5 +909,61 @@ describe('core domain', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].quantityPosted).toBe(25);
     expect(rows[0].category).toBe('produce');
+  });
+  it('microbatches distinct claims and races without duplicating reservations', async () => {
+    const [a, b] = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    const results = await Promise.allSettled([
+      createClaim(a._id, ngo.org),
+      createClaim(a._id, ngo.org),
+      createClaim(a._id, ngo2.org),
+      createClaim(b._id, ngo2.org),
+    ]);
+    expect(results.map((x) => x.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'rejected',
+      'fulfilled',
+    ]);
+    expect(String(results[0].value._id)).toBe(String(results[1].value._id));
+    expect(await Claim.countDocuments()).toBe(2);
+    expect(await FoodListing.countDocuments({ status: 'reserved' })).toBe(2);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      2,
+    );
+  });
+  it('rolls back an entire multi-listing batch if claim or notice persistence fails', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    for (const model of [Claim, Notification]) {
+      const spy = vi
+        .spyOn(model, 'insertMany')
+        .mockRejectedValueOnce(new Error('batch failed'));
+      const results = await Promise.allSettled(
+        listings.map((x) => createClaim(x._id, ngo.org)),
+      );
+      spy.mockRestore();
+      expect(results.every((x) => x.status === 'rejected')).toBe(true);
+      expect(await Claim.countDocuments()).toBe(0);
+      expect(await FoodListing.countDocuments({ status: 'available' })).toBe(2);
+      expect(await Notification.countDocuments()).toBe(0);
+    }
+  });
+  it('mixed batch errors do not reject unrelated valid claims or bypass deadlines', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    await FoodListing.updateOne(
+      { _id: listings[0]._id },
+      { $set: { bestBefore: new Date(0) } },
+    );
+    const results = await Promise.allSettled([
+      createClaim(listings[0]._id, ngo.org),
+      createClaim(listings[1]._id, ngo.org),
+    ]);
+    expect(results.map((x) => x.status)).toEqual(['rejected', 'fulfilled']);
+    expect(await Claim.countDocuments()).toBe(1);
   });
 });

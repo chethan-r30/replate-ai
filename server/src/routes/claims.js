@@ -1,4 +1,5 @@
 // Only approved NGOs claim; only the restaurant confirms the NGO's pickup code.
+import { batchRead } from '../services/read-batch.js';
 import { Router } from 'express';
 import { sendNotification } from '../services/notifications.js';
 import { logger } from '../lib/logger.js';
@@ -15,6 +16,15 @@ import {
   pagination,
 } from '../middleware/auth.js';
 import { AppError, asyncRoute, ok } from '../middleware/errors.js';
+const readNgo = batchRead(
+  (ids) =>
+    Organization.find({
+      owner: { $in: ids },
+      type: 'ngo',
+      verificationStatus: 'approved',
+    }).lean(),
+  (org) => org.owner,
+);
 export function claimRoutes(config) {
   const r = Router();
   r.use(requireAuth(config));
@@ -48,23 +58,10 @@ export function claimRoutes(config) {
         .object({ listingId: objectId })
         .strict()
         .parse(req.body);
-      const ngo = await Organization.findOne({
-        owner: req.user._id,
-        type: 'ngo',
-        verificationStatus: 'approved',
-      }).lean();
+      const ngo = await readNgo(req.user._id);
       if (!ngo) throw new AppError(403, 'Approved NGO required');
       const claim = await createClaim(listingId, ngo);
       ok(res, claim, 201);
-      const restaurant = await Organization.findById(claim.restaurant).select(
-        'owner',
-      );
-      if (restaurant)
-        sendNotification(
-          restaurant.owner,
-          'claim-request',
-          'A new food claim is waiting for your review.',
-        ).catch(() => logger.warn('Claim notification delayed'));
     }),
   );
   r.post(
