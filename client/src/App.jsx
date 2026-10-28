@@ -1,3 +1,7 @@
+import { useEffect } from 'react';
+import AuthPage from './pages/Auth.jsx';
+import Guard from './components/Guard.jsx';
+import { useAuth } from './stores/auth.js';
 // Public shell. Feature pages are introduced in their own tested phases.
 import { Link, NavLink, Route, Routes } from 'react-router-dom';
 import {
@@ -134,6 +138,10 @@ function Pending() {
 }
 export default function App() {
   const { dark, toggle } = useTheme();
+  const restore = useAuth((s) => s.restore);
+  useEffect(() => {
+    restore();
+  }, [restore]);
   return (
     <div className={dark ? 'dark' : ''}>
       <div className="min-h-screen bg-cream text-ink dark:bg-stone-950 dark:text-stone-100">
@@ -163,7 +171,7 @@ export default function App() {
               >
                 {dark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
-              <Link className="hidden font-semibold sm:inline" to="/login">
+              <Link className="font-semibold" to="/login">
                 Sign in <span aria-hidden="true">↗</span>
               </Link>
             </div>
@@ -172,6 +180,27 @@ export default function App() {
         <main id="main" className="mx-auto max-w-6xl px-5">
           <Routes>
             <Route path="/" element={<Home />} />
+            {['login', 'register'].map((mode) => (
+              <Route
+                key={mode}
+                path={`/${mode}`}
+                element={<AuthPage mode={mode} />}
+              />
+            ))}
+            <Route
+              path="/forgot-password"
+              element={<AuthPage mode="forgot" />}
+            />
+            <Route path="/reset-password" element={<AuthPage mode="reset" />} />
+            <Route path="/verify-email" element={<AuthPage mode="verify" />} />
+            <Route
+              path="/dashboard"
+              element={
+                <Guard>
+                  <Pending />
+                </Guard>
+              }
+            />
             <Route path="*" element={<Pending />} />
           </Routes>
         </main>

@@ -1,8 +1,14 @@
 // Keep pure setup checks fast; later phases add integration/browser suites.
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 export default defineConfig({
+  plugins: [react()],
   test: {
-    include: ['scripts/**/*.test.js', 'server/**/*.test.js'],
+    include: [
+      'scripts/**/*.test.js',
+      'server/**/*.test.js',
+      'client/**/*.test.jsx',
+    ],
     coverage: { provider: 'v8', include: ['server/src/services/**/*.js'] },
   },
 });

@@ -33,3 +33,9 @@
     @apply sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4 focus:text-forest;
   }
 }
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-ink dark:border-stone-600 dark:bg-stone-900 dark:text-white;
+  }
+}

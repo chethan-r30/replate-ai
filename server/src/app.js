@@ -1,5 +1,8 @@
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
+import cookieParser from 'cookie-parser';
+import { authRoutes } from './routes/auth.js';
+import { organizationRoutes } from './routes/organizations.js';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -44,6 +47,9 @@ export function createApp(config) {
     }),
   );
   app.use(hpp());
+  app.use(cookieParser());
+  app.use('/api/v1/auth', authRoutes(config));
+  app.use('/api/v1/organizations', organizationRoutes(config));
   app.get('/api/v1/health', (req, res) => {
     z.object({}).strict().parse(req.query);
     ok(res, { status: 'up', version: '0.1.0' });
