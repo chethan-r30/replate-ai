@@ -24,3 +24,9 @@ Work from `develop` on feature branches, run checks and merge through pull reque
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Foundation local modes
+
+`npm run dev` starts an explicit disposable sandbox: an in-memory MongoDB process and ephemeral JWT secrets. Data and sessions do not survive restarts. The committed and ignored environment files are not rewritten. Missing Claude, SMTP and Cloudinary credentials must not silently simulate successful integrations.
+
+`npm start -w server` is strict: replace MongoDB and JWT placeholders before startup. Production requires an HTTPS client URL. For Docker, replace the JWT placeholders first and run `docker compose up --build`; MongoDB remains private to the local host/network. Docker configuration is included but needs a Docker-capable environment for execution validation.
