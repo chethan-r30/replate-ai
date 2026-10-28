@@ -18,6 +18,7 @@ const config = parseEnv({
   JWT_REFRESH_SECRET: randomBytes(48).toString('hex'),
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
 });
+config.LOCAL_SANDBOX = true;
 await start(config);
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => mongo.stop());
