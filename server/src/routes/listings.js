@@ -2,7 +2,7 @@ import { trackBackground } from '../services/background.js';
 // Public safe listing reads; only approved restaurant owners may mutate listings.
 import mongoose from 'mongoose';
 import { SurplusHistory } from '../models/SurplusHistory.js';
-import { cached, cache, clearCache } from '../services/cache.js';
+import { cachedLoad, clearCache } from '../services/cache.js';
 import { Router } from 'express';
 import { notifyMatches } from '../services/matching.js';
 import { logger } from '../lib/logger.js';
@@ -24,48 +24,48 @@ export function listingRoutes(config) {
   const search = asyncRoute(async (req, res) => {
     const v = searchSchema.parse(req.query);
     const cacheKey = 'search:' + JSON.stringify(v);
-    const existing = cached(cacheKey);
-    if (existing) {
-      res.set('Cache-Control', 'public, max-age=1');
-      return ok(res, existing);
-    }
-    const match = {
-      status: 'available',
-      bestBefore: { $gt: new Date() },
-      'pickupWindow.end': { $gt: new Date() },
-      ...(v.category ? { category: v.category } : {}),
-      ...(v.dietary ? { dietary: v.dietary } : {}),
-    };
-    if (v.pickupBefore) match['pickupWindow.start'] = { $lte: v.pickupBefore };
-    let data;
-    if (v.lat !== undefined) {
-      data = await FoodListing.aggregate([
-        {
-          $geoNear: {
-            near: { type: 'Point', coordinates: [v.lng, v.lat] },
-            distanceField: 'distanceMeters',
-            maxDistance: v.radius * 1000,
-            spherical: true,
-            query: match,
-          },
-        },
-        { $skip: (v.page - 1) * v.limit },
-        { $limit: v.limit },
-        { $project: { reservedBy: 0, activeClaim: 0, notifiedOrgs: 0 } },
-      ]);
-    } else
-      data = await FoodListing.find(match)
-        .sort({ bestBefore: 1, _id: 1 })
-        .skip((v.page - 1) * v.limit)
-        .limit(v.limit)
-        .select('-reservedBy -activeClaim -notifiedOrgs')
-        .lean();
-    // One-second browse cache is advisory only; claim always validates live state.
-    res.set('Cache-Control', 'public, max-age=1');
-    ok(
-      res,
-      cache(cacheKey, { items: data, page: v.page, limit: v.limit }, 1000),
+    const result = await cachedLoad(
+      cacheKey,
+      async () => {
+        const match = {
+          status: 'available',
+          bestBefore: { $gt: new Date() },
+          'pickupWindow.end': { $gt: new Date() },
+          ...(v.category ? { category: v.category } : {}),
+          ...(v.dietary ? { dietary: v.dietary } : {}),
+        };
+        if (v.pickupBefore)
+          match['pickupWindow.start'] = { $lte: v.pickupBefore };
+        let data;
+        if (v.lat !== undefined) {
+          data = await FoodListing.aggregate([
+            {
+              $geoNear: {
+                near: { type: 'Point', coordinates: [v.lng, v.lat] },
+                distanceField: 'distanceMeters',
+                maxDistance: v.radius * 1000,
+                spherical: true,
+                query: match,
+              },
+            },
+            { $skip: (v.page - 1) * v.limit },
+            { $limit: v.limit },
+            { $project: { reservedBy: 0, activeClaim: 0, notifiedOrgs: 0 } },
+          ]);
+        } else
+          data = await FoodListing.find(match)
+            .sort({ bestBefore: 1, _id: 1 })
+            .skip((v.page - 1) * v.limit)
+            .limit(v.limit)
+            .select('-reservedBy -activeClaim -notifiedOrgs')
+            .lean();
+        return { items: data, page: v.page, limit: v.limit };
+      },
+      1000,
     );
+    // Advisory browse cache never approves a claim.
+    res.set('Cache-Control', 'public, max-age=1');
+    ok(res, result);
   });
   r.get('/', search);
   r.get('/nearby', search);

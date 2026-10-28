@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 // Derive impact from completed pickups, never invented counters.
 import { sharedGet, sharedSet } from '../services/shared-cache.js';
 import { Router } from 'express';
@@ -201,16 +202,19 @@ export function adminRoutes(config) {
           403,
           'Admin accounts cannot be disabled through this endpoint',
         );
-      const user = await User.findByIdAndUpdate(
-        id,
-        { $set: { deletedAt: data.disabled ? new Date() : null } },
-        { new: true },
-      );
-      if (!user) throw new AppError(404, 'User not found');
-      await AuditLog.create({
-        actor: req.user._id,
-        action: data.disabled ? 'user.disable' : 'user.enable',
-        target: id,
+      const user = await mongoose.connection.transaction(async () => {
+        const changed = await User.findByIdAndUpdate(
+          id,
+          { $set: { deletedAt: data.disabled ? new Date() : null } },
+          { new: true },
+        );
+        if (!changed) throw new AppError(404, 'User not found');
+        await AuditLog.create({
+          actor: req.user._id,
+          action: data.disabled ? 'user.disable' : 'user.enable',
+          target: id,
+        });
+        return changed;
       });
       ok(res, { id: user._id, disabled: Boolean(user.deletedAt) });
     }),
@@ -223,18 +227,21 @@ export function adminRoutes(config) {
         .object({ reason: z.string().min(3).max(500) })
         .strict()
         .parse(req.body);
-      const listing = await FoodListing.findOneAndUpdate(
-        { _id: id, status: 'available' },
-        { $set: { status: 'cancelled' } },
-        { new: true },
-      );
-      if (!listing)
-        throw new AppError(409, 'Only available listings may be moderated');
-      await AuditLog.create({
-        actor: req.user._id,
-        action: 'listing.moderate',
-        target: id,
-        reason,
+      const listing = await mongoose.connection.transaction(async () => {
+        const changed = await FoodListing.findOneAndUpdate(
+          { _id: id, status: 'available' },
+          { $set: { status: 'cancelled' } },
+          { new: true },
+        );
+        if (!changed)
+          throw new AppError(409, 'Only available listings may be moderated');
+        await AuditLog.create({
+          actor: req.user._id,
+          action: 'listing.moderate',
+          target: id,
+          reason,
+        });
+        return changed;
       });
       ok(res, listing);
     }),

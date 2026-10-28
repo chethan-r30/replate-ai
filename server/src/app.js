@@ -1,3 +1,4 @@
+import { profile } from './lib/profile.js';
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
 import {
@@ -25,6 +26,15 @@ import { databaseReady } from './config/database.js';
 import { AppError, errorHandler, notFound, ok } from './middleware/errors.js';
 export function createApp(config) {
   const app = express();
+  if (process.env.PROFILE_DB)
+    app.use((req, res, next) => {
+      req.profileStart = performance.now();
+      if (req.method === 'POST' && req.path === '/api/v1/claims')
+        res.once('finish', () =>
+          profile('claim-total', performance.now() - req.profileStart),
+        );
+      next();
+    });
   app.disable('x-powered-by');
   app.set('trust proxy', config.NODE_ENV === 'production' ? 1 : false);
   app.use(
@@ -34,9 +44,28 @@ export function createApp(config) {
       },
     }),
   );
+  app.use((req, _res, next) => {
+    if (config.NODE_ENV === 'production' && !req.secure)
+      return next(new AppError(400, 'HTTPS required'));
+    if (req.headers.origin && req.headers.origin !== config.CLIENT_URL)
+      return next(new AppError(403, 'Origin not allowed'));
+    next();
+  });
   app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
   app.use(compression());
-  app.use(pinoHttp({ logger, autoLogging: config.NODE_ENV !== 'test' }));
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: config.NODE_ENV !== 'test',
+      serializers: {
+        req: (req) => ({
+          method: req.method,
+          path: req.url?.split('?')[0],
+          remoteAddress: req.remoteAddress,
+        }),
+      },
+    }),
+  );
   app.use(
     rateLimit({
       windowMs: config.RATE_LIMIT_WINDOW_MS,

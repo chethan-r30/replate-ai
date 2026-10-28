@@ -1,3 +1,4 @@
+import { drainBackground } from './services/background.js';
 // Production entrypoint requires valid configuration and a reachable database.
 import 'dotenv/config';
 import {
@@ -25,6 +26,7 @@ export async function start(config) {
       server.close(async () => {
         expiryJob.stop();
         io.close();
+        await drainBackground();
         await closeSharedCache();
         await disconnectDatabase();
         process.exit(0);

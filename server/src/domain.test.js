@@ -1,3 +1,4 @@
+import { AuditLog } from './models/AuditLog.js';
 import { drainBackground } from './services/background.js';
 import { clearCache } from './services/cache.js';
 import { recommendations, notifyMatches } from './services/matching.js';
@@ -1063,5 +1064,69 @@ describe('core domain', () => {
       ).status,
     ).toBe(403);
     expect(await Claim.countDocuments()).toBe(0);
+  });
+  it('rolls back administrator decisions when audit persistence fails', async () => {
+    const admin = await User.create({
+      name: 'Admin',
+      email: 'audit-admin@example.com',
+      passwordHash: 'unused',
+      role: 'admin',
+    });
+    const auth = 'Bearer ' + signAccess(admin, config);
+    const spy = vi
+      .spyOn(AuditLog, 'create')
+      .mockRejectedValue(new Error('Injected audit failure'));
+    const verified = await callRoute(
+      'post',
+      `/organizations/${ngo.org._id}/verify`,
+    )
+      .set('Authorization', auth)
+      .send({ status: 'rejected', reason: 'Invalid proof' });
+    expect(verified.status).toBe(500);
+    expect((await Organization.findById(ngo.org._id)).verificationStatus).toBe(
+      'approved',
+    );
+    expect((await User.findById(ngo.user._id)).verificationStatus).toBe(
+      'approved',
+    );
+    const disabled = await callRoute('patch', `/admin/users/${ngo.user._id}`)
+      .set('Authorization', auth)
+      .send({ disabled: true });
+    expect(disabled.status).toBe(500);
+    expect((await User.findById(ngo.user._id)).deletedAt).toBeUndefined();
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const moderated = await callRoute(
+      'post',
+      `/admin/listings/${listing._id}/moderate`,
+    )
+      .set('Authorization', auth)
+      .send({ reason: 'Unsafe food' });
+    expect(moderated.status).toBe(500);
+    expect((await FoodListing.findById(listing._id)).status).toBe('available');
+    spy.mockRestore();
+  });
+  it('preserves claim live permission gates with a trailing slash', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const response = await callRoute('post', '/claims/')
+      .set('Authorization', ngo.auth)
+      .send({ listingId: String(listing._id) });
+    expect(response.status).toBe(201);
+    await Organization.updateOne(
+      { _id: ngo2.org._id },
+      { $set: { verificationStatus: 'rejected' } },
+    );
+    expect(
+      (
+        await callRoute('post', '/claims/')
+          .set('Authorization', ngo2.auth)
+          .send({ listingId: String(listing._id) })
+      ).status,
+    ).toBe(403);
   });
 });

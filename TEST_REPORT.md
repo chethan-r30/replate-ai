@@ -39,3 +39,9 @@ Performance optimization, full security hardening, CI results for this phase, re
 ## Phase7 regression evidence
 
 93 unit/integration/component tests pass on Node20; added bulk claim insertion/notification failure rollback, compare-and-swap mismatch, overlapping batches, same-NGO retry/other-NGO conflict, current approval revocation and live-read/non-caching checks. Live socket hints debounce50ms per private room while all rows remain durable. Desktop/mobile full signup-to-pickup flows pass again. Equivalent independent200-distinct-NGO CI measured260.50ms claim and212.06ms search p95,0 errors,200 distinct persisted claims/reservations: https://github.com/chethan-r30/replate-ai/actions/runs/40726937022 . PERFORMANCE.md preserves all earlier misses and topology/caveats. New CI load gate enforces latency instead of only measuring it.
+
+## Phase8 regression evidence
+
+98 tests pass with configured coverage thresholds, including password-confirmed account erasure, old-session rejection, active-handover/admin deletion guards, deletion-write rollback, production HTTPS/Origin/CSP/HSTS and audit-write failure rollback for approval/disable/moderation. SECURITY.md lists the scope and remaining deployment/retention limits.
+
+Latest Phase8 scope:100 tests pass. Added cache-miss single-flight/invalidation regression and trailing-slash claim permission regression. Services thresholds80% and client70% remain enforced. Repeatable200-user load: three independent disposable trials claims203.82/193.92/225.61ms,search86.73/92.32/89.28ms,0errors/200correct each in40730689271. Every trial must pass. Full external production latency remains unverified.

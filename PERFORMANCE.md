@@ -1,6 +1,6 @@
 # Performance evidence and open gate
 
-Measured 2026-10-28. Phase7 is **not complete**: local200-user claims pass, but the equivalent independent CI claim p95 remains above300ms.
+Measured 2026-10-28. Latest corrected-head three-trial CI40730689271 meets the performance target: claim p95=203.82/193.92/225.61ms and search86.73/92.32/89.28ms,0errors,200distinct NGO claims/reservations each. Earlier postmerge failures below are retained. Full exact-head security CI must finish before Phase8 merge.
 
 ## Frontend
 
@@ -66,3 +66,17 @@ Read10ms local profile measured245.35ms claim and225.23ms search,0 errors,200 di
 Equivalent independent CI40726937022 now passes the numerical gate: search212.06ms p95, claim260.50ms p95,0 failures,200 distinct NGOs/claims/reservations,4cores/16.76GB. Profile: three transactions of147/48/5 requests, committed in69.1/21.2/7.3ms. This does not prove multi-instance production latency. Exact-head complete CI still required before merge. Load test now fails automatically when either p95 is >=300ms or correctness counts differ.
 
 Final gated run40727183756 passes load at207.31ms claim/134.75ms search, but full CI exposed a real test-isolation race: unfinished post-response nearby notifications from the previous test could write after database cleanup. This is not ignored or rerun blindly. Best-effort jobs are now tracked and test cleanup drains them; matching retry resets its postcommit hint list so aborted transaction attempts cannot duplicate live hints. Phase7 remains pending complete corrected-head CI.
+
+Reopened performance gate: postmerge develop40727914403 missed313.59ms; Phase8 CI40728488357 missed467.92ms (search239.37ms,0errors,200 correct). The latter profile isolated transaction commits at260ms p95, with three concurrent batches120/29/51; find15/update10/insert4ms. Earlier239.88ms and260.50ms passes do not establish reliable headroom. The next bounded hypothesis uses70ms collection rather than40ms to avoid concurrent commit bursts; no write concern/durability setting is weakened. Phase8 remains unmerged and deployment blocked.
+
+70ms CI40728808949 missed329.59ms claims/search254.23ms,0errors/200 distinct correct. It did achieve one transaction (update26/insert4/commit2ms p95), so concurrent commit bursts are not the whole problem. Do not keep increasing the window: that adds latency and still lacks headroom. Next useful profiling must separate request arrival/auth/org lookup/batch wait/persist/response scheduling, then target the dominant stage rather than select a passing runner. Latest docs-only96083a1 run40728879215 is pending; no merge warranted merely if that rerun passes. Phase8 functional suite and E2E are locally passed, but performance remains a cross-phase blocker.
+
+Stage instrumentation local shows auth66-105ms p95 and queue-through-commit122-136ms at70ms window; client p95 adds another30-40ms after server finish. Search generated~1000 geo aggregations per10s because every concurrent cache miss ran the same query. A single-flight public read cache now coalesces identical in-flight misses, invalidates pending refills on mutations and reduces aggregates to10 per10s. This directly fixes a measured stampede and search p95~116ms. Tests cover invalidation during load and error cleanup. A fast-jwt dependency trial did not establish sufficient gain and was reverted; no completed permission or JWT cache is introduced. Next25ms claim batch removes unnecessary70ms wait now that public search pressure is reduced. Exact correctness/200-user threshold unchanged.
+
+CI40730183077 search159.47ms but claim309.14ms,0errors/200distinct; still fails. Single-flight search retained because it removes measured duplicate DB work, not because it solves everything. Next targeted improvement performs live user and approved-NGO reads concurrently for claim creation, rather than two sequential coalescing waits. Both results are new DB reads; role/verification checks still run before claim writes and missing/revoked NGO rejects. No completed permission cache.
+
+Live user/NGO reads now overlap while requiring both current results. Local claim220.83ms/search127.78ms,99tests+full E2E pass. The CI gate now runs three independent disposable trials sequentially and fails if ANY trial misses; artifacts retain each trial. This tests repeatable headroom instead of selecting a passing runner. No workload, count, precision or threshold is relaxed.
+
+## Repeatability checkpoint
+
+Corrected live-read concurrency plus public single-flight cache: https://github.com/chethan-r30/replate-ai/actions/runs/40730689271 . Three independently seeded disposable replica sets, same200-distinct-user workload, all below300ms and zero errors: claims203.82/193.92/225.61ms;search86.73/92.32/89.28ms. Previous corrected-head full CI40730475647 also passed with claim245.54ms/search123.12ms. The load job fails if ANY trial misses, retaining every artifact. These are same-host runner measurements, not a production SLA or proof that multi-instance/remote Atlas latency will match. No write durability, permission freshness or count checks were weakened.

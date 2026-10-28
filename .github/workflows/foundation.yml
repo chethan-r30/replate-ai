@@ -52,9 +52,16 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: PROFILE_DB=1 npm run test:load
+      - name: Enforce three independent disposable load trials
+        run: |
+          failed=0
+          for trial in 1 2 3; do
+            PROFILE_DB=1 npm run test:load || failed=1
+            cp test-results/load.json test-results/load-trial-$trial.json
+          done
+          test "$failed" = 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: load-evidence
-          path: test-results/load.json
+          path: test-results/load*.json
