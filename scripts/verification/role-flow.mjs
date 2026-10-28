@@ -157,7 +157,14 @@ try {
   await page.getByLabel('NGO pickup code').fill(code);
   await page.getByRole('button', { name: 'Confirm handover' }).click();
   await page.getByText('Status: picked_up', { exact: true }).waitFor();
-  console.log('Restaurant UI verified pickup passed');
+  if (
+    (await page.getByRole('button', { name: 'View NGO matches' }).count()) > 1
+  )
+    throw new Error('Stale matching action on history');
+  await page
+    .getByRole('heading', { name: 'Listing history', exact: true })
+    .waitFor();
+  console.log('Restaurant UI verified pickup/history passed');
   await page.screenshot({
     path: root + '/test-results/replate-completed-pickup.png',
     fullPage: true,
@@ -165,6 +172,13 @@ try {
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await login('admin@demo.example');
   await page.getByRole('heading', { name: 'Organization review' }).waitFor();
+  const protectedAdmin = page.getByRole('button', {
+    name: 'Protected admin',
+    exact: true,
+  });
+  await protectedAdmin.waitFor();
+  if (await protectedAdmin.isEnabled())
+    throw new Error('Admin disable unexpectedly enabled');
   await page.screenshot({
     path: root + '/test-results/replate-admin.png',
     fullPage: true,

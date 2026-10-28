@@ -165,7 +165,9 @@ export default function Dashboard() {
         <>
           <h2 className="mb-4 text-2xl font-semibold">Your active table</h2>
           <Status query={listings}>
-            {listings.data?.items.length ? (
+            {listings.data?.items.some((l) =>
+              ['available', 'reserved'].includes(l.status),
+            ) ? (
               <div className="mb-10 grid gap-4 md:grid-cols-3">
                 {listings.data.items
                   .filter((l) => ['available', 'reserved'].includes(l.status))
@@ -474,7 +476,11 @@ export default function Dashboard() {
                     )
                   }
                 >
-                  {u.deletedAt ? 'Enable' : 'Disable'}
+                  {u.role === 'admin'
+                    ? 'Protected admin'
+                    : u.deletedAt
+                      ? 'Enable'
+                      : 'Disable'}
                 </button>
               </div>
             ))}
