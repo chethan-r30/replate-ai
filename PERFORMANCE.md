@@ -1,6 +1,6 @@
 # Performance evidence and open gate
 
-Measured 2026-10-28. Phase7 passed on exact-head CI40727455102: claim239.88ms and search174.31ms p95 at200 distinct NGO users,0 failures. Earlier misses below are retained as experimental history.
+Measured 2026-10-28. Performance gate REOPENED after postmerge313.59ms and Phase8 CI467.92ms claim p95 failures. Earlier239.88ms/260.50ms passes are valid measurements, not proof of reliable headroom. Do not mark optimization or Phase8 complete until corrected-head full gates pass repeatably.
 
 ## Frontend
 
