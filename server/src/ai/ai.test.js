@@ -64,6 +64,40 @@ describe('forecast math', () => {
     expect(() => forecast([], { days: 31 })).toThrow();
   });
 });
+describe('timezone semantics', () => {
+  it('uses organization local weekdays and calendar dates', () => {
+    const start = new Date('2026-01-01T23:00:00Z');
+    expect(forecast([], { start, timezone: 'Asia/Kolkata' }).days[0].date).toBe(
+      '2026-01-02',
+    );
+    expect(
+      forecast([], { start, timezone: 'America/New_York' }).days[0].date,
+    ).toBe('2026-01-01');
+  });
+  it('evaluates NGO hours in its IANA timezone and fails closed without one', () => {
+    const now = new Date('2026-03-08T07:30:00Z');
+    const listing = {
+      category: 'bakery',
+      dietary: [],
+      servings: 2,
+      pickupWindow: { start: now, end: new Date('2026-03-08T08:00:00Z') },
+      bestBefore: new Date('2026-03-08T09:00:00Z'),
+    };
+    const ngo = {
+      capacity: 10,
+      timezone: 'America/New_York',
+      operatingHours: { start: 3, end: 4 },
+    };
+    expect(scoreMatch(listing, ngo, { now }).eligible).toBe(true);
+    expect(
+      scoreMatch(listing, { ...ngo, timezone: 'Asia/Kolkata' }, { now })
+        .eligible,
+    ).toBe(false);
+    expect(
+      scoreMatch(listing, { ...ngo, timezone: undefined }, { now }).eligible,
+    ).toBe(false);
+  });
+});
 describe('matching', () => {
   const now = new Date('2026-01-01T06:00:00Z');
   const listing = {
@@ -74,6 +108,7 @@ describe('matching', () => {
     bestBefore: new Date('2026-01-01T10:00:00Z'),
   };
   const ngo = {
+    timezone: 'Asia/Kolkata',
     capacity: 30,
     rating: 5,
     noShowRate: 0,

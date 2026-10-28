@@ -15,6 +15,14 @@ export const organizationSchema = z
   .object({
     name: z.string().trim().min(2).max(150),
     registrationNo: z.string().trim().min(3).max(100),
+    timezone: z.string().refine((value) => {
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: value });
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Use an IANA timezone'),
     address: z.string().trim().min(5).max(500),
     location: z
       .object({

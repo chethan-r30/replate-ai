@@ -47,6 +47,7 @@ async function actor(role, email) {
     type: role,
     name: 'Test Org',
     registrationNo: 'REG123',
+    timezone: 'Asia/Kolkata',
     address: '123 Demo Street',
     location: { type: 'Point', coordinates: [77.59, 12.97] },
     verificationDocs: ['https://example.com/proof'],

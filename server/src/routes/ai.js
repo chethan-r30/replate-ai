@@ -86,6 +86,7 @@ export function aiRoutes(config) {
         ]);
         const numeric = forecast(history, {
           categoryAverage: peers[0]?.average || 0,
+          timezone: org.timezone,
         });
         const areaHistory = await SurplusHistory.find({
           restaurant: { $in: [org._id, ...similar.map((x) => x._id)] },
@@ -93,7 +94,10 @@ export function aiRoutes(config) {
         })
           .limit(1000)
           .lean();
-        const demand = demandForecast(areaHistory, { categoryAverage: 0 });
+        const demand = demandForecast(areaHistory, {
+          categoryAverage: 0,
+          timezone: org.timezone,
+        });
         result = cache(key, {
           ...numeric,
           demand,

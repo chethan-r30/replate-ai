@@ -23,20 +23,37 @@ export function scoreMatch(
   const earliest = new Date(
     Math.max(start.getTime(), now.getTime() + travelHours * 3600000),
   );
-  const offset = Number.isFinite(ngo.utcOffsetMinutes)
-    ? ngo.utcOffsetMinutes
-    : 330;
-  const hour =
-    (((earliest.getUTCHours() + earliest.getUTCMinutes() / 60 + offset / 60) %
-      24) +
-      24) %
-    24;
-  const hours = ngo.operatingHours || { start: 0, end: 24 };
-  const feasible =
-    earliest < end &&
-    earliest < deadline &&
-    hour >= hours.start &&
-    hour < hours.end;
+  const timezone = ngo.timezone;
+  let feasible = false;
+  if (timezone) {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      });
+      const hours = ngo.operatingHours || { start: 0, end: 24 };
+      // Check the whole feasible pickup interval so a later opening is not rejected.
+      const latest = Math.min(
+        end.getTime(),
+        deadline.getTime(),
+        earliest.getTime() + 48 * 3600000,
+      );
+      for (let t = earliest.getTime(); t < latest; t += 60000) {
+        const parts = formatter.formatToParts(new Date(t));
+        const hour =
+          Number(parts.find((p) => p.type === 'hour').value) +
+          Number(parts.find((p) => p.type === 'minute').value) / 60;
+        if (hour >= hours.start && hour < hours.end) {
+          feasible = true;
+          break;
+        }
+      }
+    } catch {
+      feasible = false;
+    }
+  }
   const categories = ngo.preferences?.categories || [],
     dietary = ngo.preferences?.dietary || [];
   const fitsCategory =
