@@ -1,5 +1,8 @@
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
+import { listingRoutes } from './routes/listings.js';
+import { claimRoutes } from './routes/claims.js';
+import { uploadRoutes } from './routes/uploads.js';
 import cookieParser from 'cookie-parser';
 import { authRoutes } from './routes/auth.js';
 import { organizationRoutes } from './routes/organizations.js';
@@ -59,6 +62,9 @@ export function createApp(config) {
     if (!databaseReady()) throw new AppError(503, 'Database is not ready');
     ok(res, { status: 'ready' });
   });
+  app.use('/api/v1/listings', listingRoutes(config));
+  app.use('/api/v1/claims', claimRoutes(config));
+  app.use('/api/v1/uploads', uploadRoutes(config));
   app.use(notFound);
   app.use(errorHandler);
   return app;
