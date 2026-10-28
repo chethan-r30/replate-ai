@@ -180,7 +180,7 @@ export function createClaim(listingId, ngo) {
     waiting.push({ listingId: String(listingId), ngo, resolve, reject });
     if (!scheduled) {
       scheduled = true;
-      setTimeout(drainClaims, 25);
+      setTimeout(drainClaims, 10);
     }
   });
 }
@@ -196,11 +196,12 @@ async function persistClaimBatch(batch) {
               .map((x) => [String(x._id), x]),
           ).values(),
         ];
-        const orgs = await Organization.find({
-          _id: { $in: unique.map((x) => x.restaurant) },
-        })
-          .select('owner')
-          .lean();
+        const orgs = await Organization.collection
+          .find(
+            { _id: { $in: unique.map((x) => x.restaurant) } },
+            { session, projection: { owner: 1 }, batchSize: 1000 },
+          )
+          .toArray();
         const owners = new Map(orgs.map((x) => [String(x._id), x.owner]));
         const notices = unique
           .filter((x) => owners.has(String(x.restaurant)))
