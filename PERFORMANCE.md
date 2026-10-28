@@ -80,3 +80,9 @@ Live user/NGO reads now overlap while requiring both current results. Local clai
 ## Repeatability checkpoint
 
 Corrected live-read concurrency plus public single-flight cache: https://github.com/chethan-r30/replate-ai/actions/runs/40730689271 . Three independently seeded disposable replica sets, same200-distinct-user workload, all below300ms and zero errors: claims203.82/193.92/225.61ms;search86.73/92.32/89.28ms. Previous corrected-head full CI40730475647 also passed with claim245.54ms/search123.12ms. The load job fails if ANY trial misses, retaining every artifact. These are same-host runner measurements, not a production SLA or proof that multi-instance/remote Atlas latency will match. No write durability, permission freshness or count checks were weakened.
+
+## Phase9 regression and targeted identity-read correction
+
+Later unchanged-workload CI40732526330 and40732719270 reopened the gate. Latest trials claim296.15/327.32/304.61ms and search146.96/147.52/153.02ms, zero errors with200distinct NGO claims each. Earlier six passes did not establish enough headroom. Deployment/merge stays held.
+
+The next measured correction replaces two independent batched permission queries with one fresh batched identity aggregation and an indexed owner lookup for approved NGO IDs. This is not the earlier single-request join: it combines overlapping requests, projects only identity/approval fields for this route and retains no completed permissions. Other routes still receive their normal current user fields. Claim listing reads now project only reservation/deadline fields, rather than unrelated listing text/photos. JWT verification, live approval, transaction/notification persistence and workload remain unchanged. Three local disposable trials measure claims185.73/176.10/177.01ms, search92.95/98.79/98.73ms with200distinct NGO claims and zero errors. CI and full role-flow regression remain required; no pass is inferred from local measurements alone.

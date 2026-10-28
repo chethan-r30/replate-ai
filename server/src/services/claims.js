@@ -222,7 +222,11 @@ async function persistClaimBatch(batch) {
       }
       const listings = await FoodListing.find({
         _id: { $in: batch.map((x) => x.listingId) },
-      }).lean();
+      })
+        .select(
+          'restaurant status bestBefore pickupWindow.end reservedBy activeClaim',
+        )
+        .lean();
       const available = new Map(listings.map((x) => [String(x._id), x]));
       const pending = new Map(),
         results = [],
