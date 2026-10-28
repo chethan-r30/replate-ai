@@ -59,13 +59,19 @@ export function listingRoutes(config) {
             .limit(v.limit)
             .select('-reservedBy -activeClaim -notifiedOrgs')
             .lean();
-        return { items: data, page: v.page, limit: v.limit };
+        // Cache the public wire representation too: identical hot searches must not
+        // repeatedly serialize dates/ObjectIds on the API event loop.
+        return JSON.stringify({
+          success: true,
+          message: 'OK',
+          data: { items: data, page: v.page, limit: v.limit },
+        });
       },
       1000,
     );
     // Advisory browse cache never approves a claim.
     res.set('Cache-Control', 'public, max-age=1');
-    ok(res, result);
+    res.type('json').send(result);
   });
   r.get('/', search);
   r.get('/nearby', search);
