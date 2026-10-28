@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  :focus-visible {
+    outline: 3px solid #6e982f;
+    outline-offset: 4px;
+  }
+}
+@layer components {
+  .button {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-forest px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-900 dark:bg-leaf dark:text-forest;
+  }
+  .secondary {
+    @apply border border-stone-300 bg-transparent text-forest hover:bg-stone-100 dark:border-stone-600 dark:bg-transparent dark:text-leaf;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold tracking-[0.16em] text-stone-600 dark:text-stone-400;
+  }
+  .skip {
+    @apply sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4 focus:text-forest;
+  }
+}
