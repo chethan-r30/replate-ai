@@ -41,6 +41,7 @@ async function login(email = 'restaurant@example.com') {
 const proof = {
   name: 'Demo Kitchen',
   registrationNo: 'REG123',
+  timezone: 'Asia/Kolkata',
   address: '123 Main Street',
   location: { type: 'Point', coordinates: [77.59, 12.97] },
   verificationDocs: ['https://example.com/proof.pdf'],

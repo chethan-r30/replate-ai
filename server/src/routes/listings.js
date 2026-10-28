@@ -1,5 +1,7 @@
 // Public safe listing reads; only approved restaurant owners may mutate listings.
 import { Router } from 'express';
+import { notifyMatches } from '../services/matching.js';
+import { logger } from '../lib/logger.js';
 import { z } from 'zod';
 import { FoodListing } from '../models/FoodListing.js';
 import { Organization } from '../models/Organization.js';
@@ -94,7 +96,14 @@ export function listingRoutes(config) {
         verificationStatus: 'approved',
       });
       if (!org) throw new AppError(403, 'Approved restaurant required');
-      ok(res, await FoodListing.create({ ...data, restaurant: org._id }), 201);
+      const listing = await FoodListing.create({
+        ...data,
+        restaurant: org._id,
+      });
+      ok(res, listing, 201);
+      notifyMatches(listing._id).catch(() =>
+        logger.warn('Matching notifications delayed'),
+      );
     }),
   );
   r.patch(

@@ -27,3 +27,9 @@ Phase 2 CI run 40714153568 passed, including Docker image builds/readiness; PR #
 ## Phase 3
 
 Core models and indexes, geo/category/page listing search, ownership and verification gates, atomic listing reservation/idempotent repeat claims, restaurant-verified pickup codes, feedback, expiry cron and byte-sniffed image uploads are implemented. Node 20 lint, 23 tests and builds pass. Concurrent NGO race test verifies exactly one winner. Missing Cloudinary returns explicit 503 rather than pretending an image was saved. Cloudinary external delivery is not verified without credentials. Claim reservation and transitions now run in MongoDB transactions with replica-set local/CI configuration. Failure-path tests verify reservation and pickup rollback; concurrent pickup completes exactly once. No phase 3 UI is claimed yet (frontend features are phase 5).
+
+Phase 3 CI run 40714845602 passed with replica sets and 25 tests; PR #5 merged. Failure-path consistency gates resolved before Phase 4.
+
+## Phase 4
+
+Pure exponential smoothing/weekday forecast with cold-start category baseline, numeric area-demand estimate, explainable geo matching/capacity filters, strict Claude parser/one retry/10-second fallback, bounded cache, per-user AI limits and top-three escalation are implemented. No paid API requests are made in tests. Mocked valid/fenced JSON, malformed retry, timeout and missing-key paths pass. Human review and food safety disclaimers are mandatory output fields. Real Claude and external email delivery remain unverified without credentials. Local Node 20 lint, 36 tests and build pass. Organizations explicitly provide an IANA timezone. Forecast calendar dates/weekdays and NGO opening-hour feasibility use that timezone, including DST. Missing or invalid NGO timezone fails matching closed.

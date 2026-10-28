@@ -18,6 +18,7 @@ const schema = new mongoose.Schema(
     type: { type: String, enum: ['restaurant', 'ngo'], required: true },
     name: { type: String, required: true },
     registrationNo: { type: String, required: true },
+    timezone: { type: String, required: true },
     address: { type: String, required: true },
     location: { type: point, required: true },
     operatingHours: {
