@@ -226,6 +226,7 @@ async function persistClaimBatch(batch) {
         .select(
           'restaurant status bestBefore pickupWindow.end reservedBy activeClaim',
         )
+        .batchSize(200)
         .lean();
       const available = new Map(listings.map((x) => [String(x._id), x]));
       const pending = new Map(),
