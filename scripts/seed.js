@@ -127,7 +127,11 @@ if (
       }),
     );
   } catch (error) {
-    console.error(error.message);
+    console.error(
+      error.name === 'MongoServerSelectionError'
+        ? 'Demo database connection failed; verify URI/network access'
+        : error.message,
+    );
     process.exitCode = 1;
   } finally {
     await mongoose.disconnect();

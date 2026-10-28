@@ -10,7 +10,7 @@ for (const [name, url] of [
   ['spa', new URL('/listings', frontend)],
   ['health', new URL('/api/v1/health', api)],
   ['ready', new URL('/api/v1/ready', api)],
-  ['impact', new URL('/api/v1/analytics/impact', api)],
+  ['impact', new URL('/api/v1/analytics/public', api)],
 ]) {
   const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
   const text = await response.text();
