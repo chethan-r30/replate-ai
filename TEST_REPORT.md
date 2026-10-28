@@ -35,3 +35,7 @@ Measured 2026-10-28 on Node 20.20.2. This is local test evidence, not a live dep
 `npm run lint`, `npm run test:coverage`, `npm run build`, `npm run test:e2e`, `npm run test:load`.
 
 Performance optimization, full security hardening, CI results for this phase, real service keys and live smoke verification remain later gates. No claim of production readiness yet.
+
+## Phase7 regression evidence
+
+93 unit/integration/component tests pass on Node20; added bulk claim insertion/notification failure rollback, compare-and-swap mismatch, overlapping batches, same-NGO retry/other-NGO conflict, current approval revocation and live-read/non-caching checks. Live socket hints debounce50ms per private room while all rows remain durable. Desktop/mobile full signup-to-pickup flows pass again. Equivalent independent200-distinct-NGO CI measured260.50ms claim and212.06ms search p95,0 errors,200 distinct persisted claims/reservations: https://github.com/chethan-r30/replate-ai/actions/runs/40726937022 . PERFORMANCE.md preserves all earlier misses and topology/caveats. New CI load gate enforces latency instead of only measuring it.

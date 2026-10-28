@@ -1,6 +1,6 @@
 # Performance evidence and open gate
 
-Measured 2026-10-28. Phase7 is **not complete**: the 200-connection transactional-claim p95 target is still missed locally.
+Measured 2026-10-28. Phase7 is **not complete**: local200-user claims pass, but the equivalent independent CI claim p95 remains above300ms.
 
 ## Frontend
 
@@ -9,9 +9,9 @@ Production Vite build, Chromium and Lighthouse13.6.0, simulated mobile throttlin
 | Page     | Before Performance / Accessibility / Best Practices / SEO | After               |
 | -------- | --------------------------------------------------------- | ------------------- |
 | Home     | 99 / 95 / 96 / 91                                         | 100 / 100 / 96 / 91 |
-| Listings | 94 / 95 / 96 / 91                                         | 95 / 100 / 96 / 91  |
+| Listings | 94 / 95 / 96 / 91                                         | 94 / 100 / 96 / 91  |
 | Login    | 99 / 95 / 96 / 91                                         | 100 / 100 / 96 / 91 |
-| Impact   | 91 / 95 / 96 / 91                                         | 93 / 100 / 96 / 91  |
+| Impact   | 91 / 95 / 96 / 91                                         | 92 / 100 / 96 / 91  |
 
 Contrast changed from stone500 to stone600 on cream backgrounds. These scores meet the local key-page90 targets, not a guarantee of production scores. Best Practices includes expected anonymous refresh401 console noise. Full report HTML/JSON is generated in ignored test-results by `npm run test:lighthouse` using Node22.19 or newer.
 
@@ -27,11 +27,11 @@ API compression and ETags are enabled. Public browse cache is one second, bounde
 
 Local capacity:2 CPU cores, about2GB RAM. Disposable single-node replica set. API and autocannon run in separate processes, on the same host.200 simultaneous connections, exactly200 distinct listing claims and persisted reservations checked.
 
-| Check           | Before                                                                           | After                    | Target                  |
-| --------------- | -------------------------------------------------------------------------------- | ------------------------ | ----------------------- |
-| Search p95      | 287.63ms original shared-event-loop baseline;430.95ms isolated uncached baseline | 202.24ms isolated cached | below 300ms             |
-| Claim p95       | 1451.30ms                                                                        | 1099.38ms                | below 300ms, **missed** |
-| HTTP/error rate | 0%                                                                               | 0%                       | no unexpected failures  |
+| Check           | Before                                                                           | After                    | Target                 |
+| --------------- | -------------------------------------------------------------------------------- | ------------------------ | ---------------------- |
+| Search p95      | 287.63ms original shared-event-loop baseline;430.95ms isolated uncached baseline | 202.24ms isolated cached | below 300ms            |
+| Claim p95       | 1451.30ms                                                                        | 260.50ms independent CI  | below 300ms            |
+| HTTP/error rate | 0%                                                                               | 0%                       | no unexpected failures |
 
 A longer200-connection,2000-distinct-claim run also missed at1134.96ms p95, with zero failures and2000 persisted claims. At20 connections claim p95 was171.39ms, but this does not replace the200-connection requirement. One pool-tuning experiment had a search timeout and was discarded as a failed experiment. Larger pools alone did not solve the latency. Transactions and rollback guarantees were retained.
 
@@ -47,7 +47,7 @@ A second CI artifact (run40723132113, commit da089ca) records runner topology:4 
 
 ## In-progress invariant-preserving microbatch redesign
 
-Overlapping permission reads are grouped for3ms, without retaining completed snapshots. Claim creation groups for10ms, at most200 requests per transaction, using bulk conditional reservations and generated claim records. Every response waits for commit. Notifications persist in the same transaction; websocket/email remain post-commit best effort. Mixed invalid requests reject individually; write failures roll back the whole transaction. Race/idempotency/multi-listing claim and notification-insert failure tests pass. A crashed process loses only unanswered queued requests, never acknowledges uncommitted state.
+Overlapping permission reads are grouped for10ms, without retaining completed snapshots. Claim creation groups for40ms, at most200 requests per transaction, using bulk conditional reservations and generated claim records. Every response waits for commit. Notifications persist in the same transaction; websocket/email remain post-commit best effort. Mixed invalid requests reject individually; write failures roll back the whole transaction. Race/idempotency/multi-listing claim and notification-insert failure tests pass. A crashed process loses only unanswered queued requests, never acknowledges uncommitted state.
 
 This reduced local p95 from~1.1s to336ms; lean insertion of server-generated records with explicit timestamps then measured278.98ms with200 distinct claims,0 failures. This first below300ms local result is not final signoff: latest code must pass equivalent CI, coverage, failure tests and full browser flows. Earlier pre-lean microbatch CI run40724929128 measured393.96ms and is not represented as a pass.
 
@@ -60,3 +60,7 @@ Readiness-corrected distinct-user CI run40726061905 measured318.88ms claim p95 a
 40ms distinct-user CI measured305.77ms claim p95, still a miss, versus local233ms. The load generator previously signed JWTs inside setupRequest; tokens are now precomputed to remove client CPU work from the measured request preparation. Server still validates every JWT and the200 distinct user/workload checks are unchanged. Latest local token-precomputed run:229.65ms claim,228.29ms search,0 failures. Do not round the prior305.77ms to a pass.
 
 Token-precomputation CI run40726636412 measured347.81ms claim p95 and272.36ms search, no errors. This did not solve runner variation. Prior40ms CI profile shows38 finds and two transactions for200 callers, so the next isolated hypothesis increases live-read coalescing to10ms to avoid many fragmented permission reads; completed snapshots are still never cached. Batch commit timings/sizes are now printed only with PROFILE_DB. Live socket hints now debounce50ms per private room; all underlying notification rows still persist before claim responses, and clients re-fetch all rows. A lost socket hint at process exit is not a lost notification.
+
+Read10ms local profile measured245.35ms claim and225.23ms search,0 errors,200 distinct NGOs. One200-item transaction committed in43.1ms; total measured latency includes auth, JSON/server scheduling, batch wait and network.93 unit/integration/component tests pass plus desktop/mobile role flows after the socket-hint change. CI40726937022 pending.
+
+Equivalent independent CI40726937022 now passes the numerical gate: search212.06ms p95, claim260.50ms p95,0 failures,200 distinct NGOs/claims/reservations,4cores/16.76GB. Profile: three transactions of147/48/5 requests, committed in69.1/21.2/7.3ms. This does not prove multi-instance production latency. Exact-head complete CI still required before merge. Load test now fails automatically when either p95 is >=300ms or correctness counts differ.
