@@ -1,4 +1,5 @@
 import { recommendations, notifyMatches } from './services/matching.js';
+import { SurplusHistory } from './models/SurplusHistory.js';
 import { Notification } from './models/Notification.js';
 // Verify geo queries, ownership, deadline gates and concurrent claim handover.
 import {
@@ -212,6 +213,9 @@ describe('core domain', () => {
       ).status,
     ).toBe(200);
     expect((await FoodListing.findById(listing._id)).status).toBe('picked_up');
+    expect(
+      (await SurplusHistory.findOne({ listing: listing._id })).quantityClaimed,
+    ).toBe(10);
     expect(
       (
         await request(app)
@@ -854,5 +858,52 @@ describe('core domain', () => {
           .set('Authorization', restaurant.auth)
       ).status,
     ).toBe(400);
+  });
+  it('rolls back listing post and expiry if related history/claim writes fail', async () => {
+    const history = vi
+      .spyOn(SurplusHistory, 'create')
+      .mockRejectedValueOnce(new Error('history failed'));
+    const failed = await request(app)
+      .post('/api/v1/listings')
+      .set('Authorization', restaurant.auth)
+      .send(food());
+    history.mockRestore();
+    expect(failed.status).toBe(500);
+    expect(await FoodListing.countDocuments()).toBe(0);
+    const listing = await post();
+    expect(
+      (await SurplusHistory.findOne({ listing: listing._id })).quantityPosted,
+    ).toBe(10);
+    const c = (
+      await request(app)
+        .post('/api/v1/claims')
+        .set('Authorization', ngo.auth)
+        .send({ listingId: listing._id })
+    ).body.data;
+    await FoodListing.updateOne(
+      { _id: listing._id },
+      { $set: { bestBefore: new Date(0) } },
+    );
+    const update = vi
+      .spyOn(Claim, 'updateOne')
+      .mockRejectedValueOnce(new Error('expiry failed'));
+    await expect(expireListings()).rejects.toThrow('expiry failed');
+    update.mockRestore();
+    expect((await FoodListing.findById(listing._id)).status).toBe('reserved');
+    expect((await Claim.findById(c._id)).status).toBe('requested');
+    expect(await expireListings()).toBe(1);
+    expect((await Claim.findById(c._id)).status).toBe('no_show');
+  });
+  it('updates forecast history on listing edits without duplicate records', async () => {
+    const listing = await post();
+    const r = await request(app)
+      .patch('/api/v1/listings/' + listing._id)
+      .set('Authorization', restaurant.auth)
+      .send({ ...food(), servings: 25, category: 'produce' });
+    expect(r.status).toBe(200);
+    const rows = await SurplusHistory.find({ listing: listing._id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].quantityPosted).toBe(25);
+    expect(rows[0].category).toBe('produce');
   });
 });

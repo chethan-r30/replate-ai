@@ -4,7 +4,7 @@ Measured 2026-10-28 on Node 20.20.2. This is local test evidence, not a live dep
 
 ## Automated checks
 
-- 78 unit/integration/component tests pass, with disposable MongoDB replica sets.
+- 80 unit/integration/component tests pass, with disposable MongoDB replica sets.
 - Server services coverage: lines 95.17%, statements 90.56%, functions 94.11%, branches 82.22%. Thresholds: 80% each.
 - Client coverage: lines 87.58%, statements 85.55%, functions 85.82%, branches 85.02%. Thresholds: 70% each. Includes App, components, pages, API and auth store; excludes entrypoint and test files.
 - AI modules are included in coverage and pure math/matching, valid JSON, malformed retry, timeout, no-key and API-failure paths pass without paid requests.
@@ -22,6 +22,9 @@ Measured 2026-10-28 on Node 20.20.2. This is local test evidence, not a live dep
 `npm run test:load`: disposable single-node replica set, 200 connections. Search: 6,873 responses in 10 seconds, p95 287.63ms, p99 4955ms, zero errors/non-2xx. Claim: 200 distinct listing claims, p95 1451.30ms, p99 1483ms, zero errors/non-2xx; 200 persisted claims and 200 reserved listings verified. Percentiles use response-event timings, not a substituted percentile. Load generator and server share local CPU, so results are baseline only. Claim latency misses the Phase7 p95 target and must be improved and remeasured. An earlier invalid load fixture repeatedly claimed one listing and was discarded after the persisted-count assertion exposed it.
 
 ## Bugs found and fixed during this phase
+
+- Listing creation/edit and completed pickups now persist numeric forecast history transactionally. Missing history writes are failure-tested.
+- Expiry updates listing and active claim in one transaction with rollback failure test, avoiding a stranded reserved claim.
 
 - Organization PATCH defaults silently made an empty patch into writes. Only explicitly supplied keys now persist; empty changes reject with 400.
 - NGO allocated capacity now uses each NGO local calendar day rather than UTC midnight, tested at the India date boundary.

@@ -1,4 +1,5 @@
 // Expire listings without deleting history or claim evidence.
+import mongoose from 'mongoose';
 import cron from 'node-cron';
 import { Organization } from '../models/Organization.js';
 import { sendNotification } from '../services/notifications.js';
@@ -7,32 +8,46 @@ import { FoodListing } from '../models/FoodListing.js';
 import { Claim } from '../models/Claim.js';
 import { logger } from '../lib/logger.js';
 export async function expireListings() {
-  const expired = await FoodListing.find({
+  const ids = await FoodListing.find({
     status: { $in: ['available', 'reserved'] },
     $or: [
       { bestBefore: { $lte: new Date() } },
       { 'pickupWindow.end': { $lte: new Date() } },
     ],
   })
-    .select('_id activeClaim')
+    .select('_id')
+    .limit(500)
     .lean();
-  if (!expired.length) return 0;
-  await FoodListing.updateMany(
-    {
-      _id: { $in: expired.map((x) => x._id) },
-      status: { $in: ['available', 'reserved'] },
-    },
-    { $set: { status: 'expired' } },
-  );
-  await Claim.updateMany(
-    {
-      _id: { $in: expired.map((x) => x.activeClaim).filter(Boolean) },
-      status: { $in: ['requested', 'approved'] },
-    },
-    { $set: { status: 'no_show' } },
-  );
-  return expired.length;
+  let count = 0;
+  for (const { _id } of ids) {
+    count += await mongoose.connection.transaction(async () => {
+      const listing = await FoodListing.findOneAndUpdate(
+        {
+          _id,
+          status: { $in: ['available', 'reserved'] },
+          $or: [
+            { bestBefore: { $lte: new Date() } },
+            { 'pickupWindow.end': { $lte: new Date() } },
+          ],
+        },
+        { $set: { status: 'expired' } },
+        { new: false },
+      );
+      if (!listing) return 0;
+      if (listing.activeClaim)
+        await Claim.updateOne(
+          {
+            _id: listing.activeClaim,
+            status: { $in: ['requested', 'approved'] },
+          },
+          { $set: { status: 'no_show' } },
+        );
+      return 1;
+    });
+  }
+  return count;
 }
+
 export async function escalateMatches() {
   const listings = await FoodListing.find({
     status: 'available',
