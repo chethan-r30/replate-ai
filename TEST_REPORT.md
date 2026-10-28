@@ -45,3 +45,7 @@ Performance optimization, full security hardening, CI results for this phase, re
 98 tests pass with configured coverage thresholds, including password-confirmed account erasure, old-session rejection, active-handover/admin deletion guards, deletion-write rollback, production HTTPS/Origin/CSP/HSTS and audit-write failure rollback for approval/disable/moderation. SECURITY.md lists the scope and remaining deployment/retention limits.
 
 Latest Phase8 scope:100 tests pass. Added cache-miss single-flight/invalidation regression and trailing-slash claim permission regression. Services thresholds80% and client70% remain enforced. Repeatable200-user load: three independent disposable trials claims203.82/193.92/225.61ms,search86.73/92.32/89.28ms,0errors/200correct each in40730689271. Every trial must pass. Full external production latency remains unverified.
+
+### Corrected release and free hosting checkpoint
+
+Main0437c85 full CI40748383643 passed104tests, coverage, lint, build, desktop/mobile role E2E and container checks. Three200-user load trials passed search97.80/108.08/103.64ms and claims171.61/197.72/186.26ms, zeroerrors,200distinct claims/reservations. Earlier misses remain in PERFORMANCE.md. Node20-built static frontend was published through Vercel's supported prebuilt route after its remote builder rejected Node20. Read-only live smoke passed home,SPA,health,ready,impact. Final live mutation/auth/socket acceptance still pending demo seed access. No production-ready or phase-complete claim.

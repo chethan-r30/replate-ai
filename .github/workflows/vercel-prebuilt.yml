@@ -1,0 +1,34 @@
+name: Node20 prebuilt frontend
+on:
+  workflow_run:
+    workflows: [Foundation checks]
+    branches: [main]
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  deploy:
+    # No build runtime upgrade. Enable only after storing a scoped Vercel token.
+    if: ${{ vars.REPLATE_PREBUILT_DEPLOY_ENABLED == 'true' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w client && node scripts/prepare-vercel-output.js
+        env:
+          VITE_API_URL: /api/v1
+          VITE_SOCKET_URL: https://replate-api.onrender.com
+          VITE_DEMO_MODE: 'true'
+      - name: Deploy static output only
+        run: npx --yes vercel@65.5.0 deploy --prebuilt --prod --yes --scope chethan-r30s-projects --project replate-ai --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_93k0oAoRqyU0cp8GicAOiDR7
+          VERCEL_PROJECT_ID: prj_U5p74ZW6uNj2AflQD5iCHdo9KOzg

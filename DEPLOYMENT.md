@@ -108,3 +108,20 @@ Render service: https://dashboard.render.com/web/srv-dbh3g761egvs739c2vp0/settin
 Atlas IP Access List now contains only the two Render Singapore egress ranges shown by this service:74.220.52.0/24 and74.220.60.0/24, both Active. They are shared regional ranges, not dedicated addresses. No0.0.0.0/0 entry. User replate_app remains readWrite@replate, restricted to ReplateAI. The actual Node driver URI was acquired and its credentialed version saved directly in Render without printing it. Separate JWT secrets were generated in Render and saved. CLIENT_URL still awaits the actual final Vercel origin. Nonsecret NODE_ENV/PORT/expiry/model values are saved. No seed-machine IP or demo data has been added yet; one-time seed credential use awaits owner approval.
 
 The frontend proxy config uses the actual Render origin and stays ahead of SPA fallback. Vercel import was inspected with Vite, repository root, npm ci, npm run build -w client, client/dist; demo/API/socket public variables were prepared but the form was not submitted. Re-enter them on the next import. Do not send an assigned or frontend-only URL as a completed demo.
+
+### Node20 prebuilt deployment (verified 2026-10-29)
+
+Vercel stopped accepting remote Node20 builds. Do not change the application's Node20 requirement just to bypass this. The verified alternative builds browser assets under Node20 locally or in GitHub Actions and uploads static-only Build Output API files. No Node server function runs on Vercel. The deployment CLI itself can run on a currently supported tooling Node version independently of the application build.
+
+```sh
+VITE_API_URL=/api/v1 VITE_SOCKET_URL=https://replate-api.onrender.com VITE_DEMO_MODE=true npm run build -w client
+node scripts/prepare-vercel-output.js
+npx vercel@65.5.0 login
+npx vercel@65.5.0 deploy --prebuilt --prod --scope chethan-r30s-projects --project replate-ai --yes
+```
+
+Run the first two commands under Node20. The packaging script copies only client/dist and transforms vercel.json headers/proxy/SPA routing with the official Vercel routing utility. It explicitly matches the root pathname for security headers. Never put .env, source credentials or CLI auth storage into static output. .vercel is gitignored. CLI login uses the ordinary first-party device flow; never export browser cookies.
+
+Verified stable frontend: https://replate-ai-sigma.vercel.app/ . API: https://replate-api.onrender.com/ . The public home/login warning and layout were inspected. CSP, frame denial and nosniff were checked, along with SPA deep links. Render CLIENT_URL is the stable frontend origin. Read-only smoke checks passed home, SPA, API health, readiness and public impact. This is not final acceptance: seeded posting-to-pickup, refresh and sockets remain pending.
+
+The prebuilt workflow is deliberately disabled until REPLATE_PREBUILT_DEPLOY_ENABLED=true and an approved scoped VERCEL_TOKEN is stored in GitHub's production environment. Do not commit that token or expose it to pull requests. It runs only after successful main Foundation checks and checks out that exact tested SHA. The current Vercel Git remote-build integration still rejects Node20; it is not a working automatic frontend release path. Manual authenticated prebuilt deployment is verified. Enable automated credentialed deployment only after its token access is arranged securely.
