@@ -5,7 +5,7 @@ Measured 2026-10-28 on Node 20.20.2. This is local test evidence, not a live dep
 ## Automated checks
 
 - 78 unit/integration/component tests pass, with disposable MongoDB replica sets.
-- Server services coverage: lines 95.65%, statements 90.85%, functions 93.75%, branches 82.95%. Thresholds: 80% each.
+- Server services coverage: lines 95.17%, statements 90.56%, functions 94.11%, branches 82.22%. Thresholds: 80% each.
 - Client coverage: lines 87.58%, statements 85.55%, functions 85.82%, branches 85.02%. Thresholds: 70% each. Includes App, components, pages, API and auth store; excludes entrypoint and test files.
 - AI modules are included in coverage and pure math/matching, valid JSON, malformed retry, timeout, no-key and API-failure paths pass without paid requests.
 - MSW mocks real fetch for API/client tests. Latest MSW required newer JavaScript primitives than Node20, so pinned compatible 2.7.3. Do not casually remove the pin.
