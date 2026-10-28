@@ -54,3 +54,9 @@ Visual testing fixed two actual defects: StrictMode duplicate refresh revoked a 
 No live URL, production readiness, coverage target, load/security/performance target or complete end-to-end definition of done is claimed.
 
 Phase 5 follow-up: Socket auth/user-room isolation test passes; production offline shell loaded after network was disabled. Explicit local role-flow smoke still passes. Active/reserved listings are now separated from completed/cancelled/expired history, with no matching controls on history. Self-disable is blocked and all admin targets are disabled from this management endpoint/UI to prevent last-admin lockout. Latest local count: 43 tests. No full coverage or installability certification yet.
+
+### Phase 5 gate passed and Phase 6 begun
+
+PR7 merged to develop after latest corrected-head CI passed: https://github.com/chethan-r30/replate-ai/actions/runs/40717685662 . Local role smoke, history-control check, admin protected-action check, 43 unit/integration tests, lint/build, socket privacy and offline shell check passed. Current branch: feat/phase-6-testing.
+
+Phase 6 baseline coverage command ran successfully, but existing config only includes server services. Baseline services coverage: statements 86.92%, branches 79.54%, functions 90.62%, lines 91.30%. This is NOT the final scope/threshold result: widen to server services and AI with explicit thresholds, add client coverage with 70% target and MSW, then fill uncovered paths. Notifications are weakest baseline service (53.84% lines). Required full signup/email/admin-approval desktop/mobile E2E, every-route matrix and 200-concurrent load tests remain unrun. Preserve a TEST_REPORT distinguishing real measured results from pending targets. No deployment or external-key verification yet.
