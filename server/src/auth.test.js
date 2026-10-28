@@ -2,7 +2,7 @@
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createApp } from './app.js';
 import { parseEnv } from './config/env.js';
 import { User } from './models/User.js';
@@ -46,7 +46,7 @@ const proof = {
   verificationDocs: ['https://example.com/proof.pdf'],
 };
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(mongo.getUri());
   await Promise.all([
     User.init(),

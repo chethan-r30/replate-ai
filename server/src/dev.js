@@ -1,12 +1,12 @@
 // Explicit local sandbox: disposable MongoDB and ephemeral JWT keys, never production.
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { parseEnv } from './config/env.js';
 import { start } from './index.js';
 if (process.env.NODE_ENV === 'production')
   throw new Error('Local sandbox cannot run in production');
-const mongo = await MongoMemoryServer.create();
+const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 console.warn(
   'LOCAL SANDBOX: disposable data and keys. External integrations are disabled until configured.',
 );

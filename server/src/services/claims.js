@@ -16,7 +16,7 @@ export const transitions = {
 export function canTransition(from, to) {
   return Boolean(transitions[from]?.includes(to));
 }
-export async function createClaim(listingId, ngo) {
+async function reserveClaim(listingId, ngo) {
   const id = new mongoose.Types.ObjectId();
   const listing = await FoodListing.findOneAndUpdate(
     {
@@ -71,7 +71,7 @@ export async function createClaim(listingId, ngo) {
     throw error;
   }
 }
-export async function changeClaim(claimId, user, action, code) {
+async function transitionClaim(claimId, user, action, code) {
   const org = await Organization.findOne({ owner: user._id });
   if (!org) throw new AppError(403, 'Organization required');
   const claim = await Claim.findById(claimId).select('+pickupCode');
@@ -137,4 +137,15 @@ export async function changeClaim(claimId, user, action, code) {
   const safe = changed.toObject();
   delete safe.pickupCode;
   return safe;
+}
+
+// MongoDB 8 transactionAsyncLocalStorage attaches every operation to this transaction.
+mongoose.set('transactionAsyncLocalStorage', true);
+export async function createClaim(listingId, ngo) {
+  return mongoose.connection.transaction(() => reserveClaim(listingId, ngo));
+}
+export async function changeClaim(claimId, user, action, code) {
+  return mongoose.connection.transaction(() =>
+    transitionClaim(claimId, user, action, code),
+  );
 }

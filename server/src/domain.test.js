@@ -1,8 +1,16 @@
 // Verify geo queries, ownership, deadline gates and concurrent claim handover.
-import { beforeAll, afterAll, beforeEach, describe, it, expect } from 'vitest';
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  describe,
+  it,
+  expect,
+  vi,
+} from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createApp } from './app.js';
 import { parseEnv } from './config/env.js';
 import { User } from './models/User.js';
@@ -70,7 +78,7 @@ async function post() {
   return r.body.data;
 }
 beforeAll(async () => {
-  mongo = await MongoMemoryServer.create();
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(mongo.getUri());
   await Promise.all([
     User.init(),
@@ -277,5 +285,50 @@ describe('core domain', () => {
           .attach('file', png, 'food.png')
       ).status,
     ).toBe(503);
+  });
+  it('rolls back reservation when claim persistence fails', async () => {
+    const listing = await post();
+    const spy = vi
+      .spyOn(Claim, 'create')
+      .mockRejectedValueOnce(new Error('Injected persistence failure'));
+    const r = await request(app)
+      .post('/api/v1/claims')
+      .set('Authorization', ngo.auth)
+      .send({ listingId: listing._id });
+    spy.mockRestore();
+    expect(r.status).toBe(500);
+    expect((await FoodListing.findById(listing._id)).status).toBe('available');
+    expect(await Claim.countDocuments()).toBe(0);
+  });
+  it('rolls back pickup if listing update fails and prevents duplicate completion', async () => {
+    const listing = await post();
+    const c = await request(app)
+      .post('/api/v1/claims')
+      .set('Authorization', ngo.auth)
+      .send({ listingId: listing._id });
+    await request(app)
+      .post(`/api/v1/claims/${c.body.data._id}/approve`)
+      .set('Authorization', restaurant.auth)
+      .send({});
+    const spy = vi
+      .spyOn(FoodListing, 'updateOne')
+      .mockRejectedValueOnce(new Error('Injected listing failure'));
+    const failed = await request(app)
+      .post(`/api/v1/claims/${c.body.data._id}/confirm-pickup`)
+      .set('Authorization', restaurant.auth)
+      .send({ code: c.body.data.pickupCode });
+    spy.mockRestore();
+    expect(failed.status).toBe(500);
+    expect((await Claim.findById(c.body.data._id)).status).toBe('approved');
+    expect((await FoodListing.findById(listing._id)).status).toBe('reserved');
+    const results = await Promise.all(
+      [1, 2].map(() =>
+        request(app)
+          .post(`/api/v1/claims/${c.body.data._id}/confirm-pickup`)
+          .set('Authorization', restaurant.auth)
+          .send({ code: c.body.data.pickupCode }),
+      ),
+    );
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
 });
