@@ -1,6 +1,6 @@
 # Performance evidence and open gate
 
-Measured 2026-10-28. Phase7 is **not complete**: local200-user claims pass, but the equivalent independent CI claim p95 remains above300ms.
+Measured 2026-10-28. Phase7 passed on exact-head CI40727455102: claim239.88ms and search174.31ms p95 at200 distinct NGO users,0 failures. Earlier misses below are retained as experimental history.
 
 ## Frontend
 

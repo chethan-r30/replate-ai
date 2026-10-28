@@ -34,6 +34,8 @@ export function startRealtime(server, config) {
 const emitHint = coalesceEvents((userId, data) =>
   io?.to(userId).emit('notification', data),
 );
+export const disconnectUser = (userId) =>
+  io?.in(String(userId)).disconnectSockets(true);
 export const emitNotification = (userId, data) => {
   if (io) emitHint(String(userId), data);
 };

@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { hasKey } from '../config/env.js';
 import { logger } from './logger.js';
 const devInbox = new Map();
+export const clearDevInbox = (email) => devInbox.delete(email);
 export const readDevInbox = (email) => devInbox.get(email) || [];
 export async function sendActionEmail(user, type, token, config) {
   const url = new URL(

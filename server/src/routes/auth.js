@@ -1,3 +1,4 @@
+import { deleteAccount } from '../services/privacy.js';
 // Full email/password lifecycle with rotating refresh families and single-use links.
 import { Router } from 'express';
 import { z } from 'zod';
@@ -258,6 +259,27 @@ export function authRoutes(config) {
       ok(res, null);
     }),
   );
+  router.delete(
+    '/me',
+    originGuard,
+    requireAuth(config),
+    limiter,
+    asyncRoute(async (req, res) => {
+      const data = z
+        .object({
+          password: z.string().min(1).max(72),
+          confirmation: z.literal('DELETE'),
+        })
+        .strict()
+        .parse(req.body);
+      const user = await User.findById(req.user._id).select('+passwordHash');
+      if (!user || !(await bcrypt.compare(data.password, user.passwordHash)))
+        throw new AppError(401, 'Password confirmation failed');
+      await deleteAccount(user);
+      clear(res);
+      ok(res, null);
+    }),
+  );
   router.get(
     '/me',
     requireAuth(config),
@@ -267,7 +289,7 @@ export function authRoutes(config) {
     }),
   );
   // Explicit disposable-sandbox inbox helps local testing without email credentials.
-  if (config.LOCAL_SANDBOX)
+  if (config.LOCAL_SANDBOX && config.NODE_ENV !== 'production')
     router.get(
       '/dev-inbox',
       asyncRoute(async (req, res) => {

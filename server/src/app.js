@@ -34,9 +34,28 @@ export function createApp(config) {
       },
     }),
   );
+  app.use((req, _res, next) => {
+    if (config.NODE_ENV === 'production' && !req.secure)
+      return next(new AppError(400, 'HTTPS required'));
+    if (req.headers.origin && req.headers.origin !== config.CLIENT_URL)
+      return next(new AppError(403, 'Origin not allowed'));
+    next();
+  });
   app.use(cors({ origin: config.CLIENT_URL, credentials: true }));
   app.use(compression());
-  app.use(pinoHttp({ logger, autoLogging: config.NODE_ENV !== 'test' }));
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: config.NODE_ENV !== 'test',
+      serializers: {
+        req: (req) => ({
+          method: req.method,
+          path: req.url?.split('?')[0],
+          remoteAddress: req.remoteAddress,
+        }),
+      },
+    }),
+  );
   app.use(
     rateLimit({
       windowMs: config.RATE_LIMIT_WINDOW_MS,

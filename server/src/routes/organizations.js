@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 // Organization proof and admin approval are server-side gates, never client flags.
 import { Router } from 'express';
 import { z } from 'zod';
@@ -146,23 +147,26 @@ export function organizationRoutes(config) {
         })
         .strict()
         .parse(req.body);
-      const org = await Organization.findById(id);
-      if (!org) throw new AppError(404, 'Organization not found');
-      if (!org.registrationNo || !org.verificationDocs.length)
-        throw new AppError(400, 'Verification details required');
-      org.verificationStatus = data.status;
-      await org.save();
-      await User.updateOne(
-        { _id: org.owner },
-        { $set: { verificationStatus: data.status } },
-      );
-      await AuditLog.create({
-        actor: req.user._id,
-        action: `organization.${data.status}`,
-        target: id,
-        reason: data.reason,
+      const result = await mongoose.connection.transaction(async () => {
+        const org = await Organization.findById(id);
+        if (!org) throw new AppError(404, 'Organization not found');
+        if (!org.registrationNo || !org.verificationDocs.length)
+          throw new AppError(400, 'Verification details required');
+        org.verificationStatus = data.status;
+        await org.save();
+        await User.updateOne(
+          { _id: org.owner },
+          { $set: { verificationStatus: data.status } },
+        );
+        await AuditLog.create({
+          actor: req.user._id,
+          action: `organization.${data.status}`,
+          target: id,
+          reason: data.reason,
+        });
+        return org;
       });
-      ok(res, org);
+      ok(res, result);
     }),
   );
   return r;
