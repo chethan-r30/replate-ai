@@ -33,3 +33,24 @@ Phase 3 CI run 40714845602 passed with replica sets and 25 tests; PR #5 merged. 
 ## Phase 4
 
 Pure exponential smoothing/weekday forecast with cold-start category baseline, numeric area-demand estimate, explainable geo matching/capacity filters, strict Claude parser/one retry/10-second fallback, bounded cache, per-user AI limits and top-three escalation are implemented. No paid API requests are made in tests. Mocked valid/fenced JSON, malformed retry, timeout and missing-key paths pass. Human review and food safety disclaimers are mandatory output fields. Real Claude and external email delivery remain unverified without credentials. Local Node 20 lint, 36 tests and build pass. Organizations explicitly provide an IANA timezone. Forecast calendar dates/weekdays and NGO opening-hour feasibility use that timezone, including DST. Missing or invalid NGO timezone fails matching closed.
+
+Phase 4 timezone fix passed CI run 40715638979; PR #6 merged with 38 local tests.
+
+## Phase 5 (verification in progress)
+
+Role dashboards, responsive browse/map/filter/detail, listing create/edit with optional AI note/photo draft, organization/timezone/preferences, handover UI, feedback, impact, private Socket.io rooms, persisted notifications and PWA offline shell are implemented. Local Node 20 lint, 41 tests and production builds pass. Local browser smoke script `node scripts/verification/role-flow.mjs` passes restaurant post, NGO request, restaurant code-verified pickup, admin dashboard using disposable pre-approved fixtures. This is NOT the Phase 6 signup/admin-approval end-to-end test. Mobile/desktop screenshots inspected; no horizontal overflow in browse/form checks. Real SMTP/Cloudinary delivery remains unavailable without keys.
+
+Visual testing fixed two actual defects: StrictMode duplicate refresh revoked a valid session (deduplicated with regression test), and posting left cached dashboard listings stale (invalidate queries after save). Sign-out now clears cached private data between users. No claim that all coverage, WCAG, offline-install, socket delivery or phase 5 acceptance checks are finished. Phase 5 must remain pending until its remaining verification passes.
+
+## Remaining ordered work
+
+- Finish Phase 5 acceptance checks and latest CI; review notification fallback/expiry/escalation paths, socket auth/delivery, offline shell, empty/error states and admin moderation. Check account-switch cache isolation and mobile role pages.
+- Phase 6: complete every-route case matrix, expired JWT/injection/XSS/security tests, mocked SDK tests, MSW frontend tests, signup+email+admin approval+post+claim+pickup E2E in desktop and mobile, 200-user load, coverage thresholds and TEST_REPORT.md.
+- Phase 7: explain indexes, cache/Redis, image transforms, bundle analysis, Lighthouse four scores >=90, API p95 <300ms, initial JS <250KB gzip; record before/after measurements.
+- Phase 8: full security audit, deletion endpoint, strict CSP/CORS/HTTPS, dependency findings, secrets/history scan, Dependabot, race/failure review. Router v6 has two moderate advisories; preserve explicit version request unless a scoped decision is required.
+- Phase 9: deployment configs, CI/CD full gates, seed data, Atlas/Render/Vercel account and keys, monitoring and live smoke. No paid services or legal terms approved. Cross-site refresh-cookie semantics need an explicit production solution, not assuming localhost SameSite behavior works on separate hosts.
+- Phase 10: complete README/architecture/API/deployment/test/performance docs and fresh-clone verification. Main currently has bootstrap only; releases go via protected PR, never bypass.
+
+No live URL, production readiness, coverage target, load/security/performance target or complete end-to-end definition of done is claimed.
+
+Phase 5 follow-up: Socket auth/user-room isolation test passes; production offline shell loaded after network was disabled. Explicit local role-flow smoke still passes. Active/reserved listings are now separated from completed/cancelled/expired history, with no matching controls on history. Self-disable is blocked and all admin targets are disabled from this management endpoint/UI to prevent last-admin lockout. Latest local count: 43 tests. No full coverage or installability certification yet.

@@ -1,5 +1,10 @@
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
+import {
+  analyticsRoutes,
+  notificationRoutes,
+  adminRoutes,
+} from './routes/analytics.js';
 import { aiRoutes } from './routes/ai.js';
 import { listingRoutes } from './routes/listings.js';
 import { claimRoutes } from './routes/claims.js';
@@ -67,6 +72,9 @@ export function createApp(config) {
   app.use('/api/v1/claims', claimRoutes(config));
   app.use('/api/v1/uploads', uploadRoutes(config));
   app.use('/api/v1/ai', aiRoutes(config));
+  app.use('/api/v1/analytics', analyticsRoutes(config));
+  app.use('/api/v1/notifications', notificationRoutes(config));
+  app.use('/api/v1/admin', adminRoutes(config));
   app.use(notFound);
   app.use(errorHandler);
   return app;

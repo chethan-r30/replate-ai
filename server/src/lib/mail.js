@@ -49,3 +49,35 @@ export async function sendActionEmail(user, type, token, config) {
     return false;
   }
 }
+
+// Notification delivery reuses the SMTP transport without exposing any action links.
+export async function sendPlainEmail(userId, message, config) {
+  if (
+    !config ||
+    ![config.SMTP_HOST, config.SMTP_USER, config.SMTP_PASS].every(hasKey)
+  )
+    return false;
+  const { User } = await import('../models/User.js');
+  const user = await User.findById(userId).select('email').lean();
+  if (!user) return false;
+  try {
+    await nodemailer
+      .createTransport({
+        host: config.SMTP_HOST,
+        port: config.SMTP_PORT,
+        secure: config.SMTP_PORT === 465,
+        auth: { user: config.SMTP_USER, pass: config.SMTP_PASS },
+        connectionTimeout: 10000,
+      })
+      .sendMail({
+        from: config.EMAIL_FROM,
+        to: user.email,
+        subject: 'ReplateAI update',
+        text: message,
+      });
+    return true;
+  } catch {
+    logger.warn('Notification email not delivered');
+    return false;
+  }
+}

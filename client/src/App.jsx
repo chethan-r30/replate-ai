@@ -1,3 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { lazy, Suspense } from 'react';
+const Explore = lazy(() => import('./pages/Explore.jsx'));
+const ListingDetail = lazy(() => import('./pages/ListingDetail.jsx'));
+const ListingForm = lazy(() => import('./pages/ListingForm.jsx'));
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const OrganizationPage = lazy(() => import('./pages/Organization.jsx'));
+const Impact = lazy(() => import('./pages/Impact.jsx'));
 import { useEffect } from 'react';
 import AuthPage from './pages/Auth.jsx';
 import Guard from './components/Guard.jsx';
@@ -138,6 +146,9 @@ function Pending() {
 }
 export default function App() {
   const { dark, toggle } = useTheme();
+  const queryClient = useQueryClient();
+  const user = useAuth((s) => s.user);
+  const logout = useAuth((s) => s.logout);
   const restore = useAuth((s) => s.restore);
   useEffect(() => {
     restore();
@@ -171,38 +182,95 @@ export default function App() {
               >
                 {dark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
-              <Link className="font-semibold" to="/login">
-                Sign in <span aria-hidden="true">↗</span>
-              </Link>
+              {user ? (
+                <>
+                  <Link className="font-semibold" to="/dashboard">
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      await logout();
+                      queryClient.clear();
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <Link className="font-semibold" to="/login">
+                  Sign in <span aria-hidden="true">↗</span>
+                </Link>
+              )}
             </div>
           </nav>
         </header>
         <main id="main" className="mx-auto max-w-6xl px-5">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            {['login', 'register'].map((mode) => (
+          <Suspense
+            fallback={
+              <p role="status" className="py-12">
+                Loading page...
+              </p>
+            }
+          >
+            <Routes>
+              <Route path="/" element={<Home />} />
+              {['login', 'register'].map((mode) => (
+                <Route
+                  key={mode}
+                  path={`/${mode}`}
+                  element={<AuthPage mode={mode} />}
+                />
+              ))}
               <Route
-                key={mode}
-                path={`/${mode}`}
-                element={<AuthPage mode={mode} />}
+                path="/forgot-password"
+                element={<AuthPage mode="forgot" />}
               />
-            ))}
-            <Route
-              path="/forgot-password"
-              element={<AuthPage mode="forgot" />}
-            />
-            <Route path="/reset-password" element={<AuthPage mode="reset" />} />
-            <Route path="/verify-email" element={<AuthPage mode="verify" />} />
-            <Route
-              path="/dashboard"
-              element={
-                <Guard>
-                  <Pending />
-                </Guard>
-              }
-            />
-            <Route path="*" element={<Pending />} />
-          </Routes>
+              <Route
+                path="/reset-password"
+                element={<AuthPage mode="reset" />}
+              />
+              <Route
+                path="/verify-email"
+                element={<AuthPage mode="verify" />}
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <Guard>
+                    <Dashboard />
+                  </Guard>
+                }
+              />
+              <Route path="/listings" element={<Explore />} />
+              <Route
+                path="/listings/new"
+                element={
+                  <Guard roles={['restaurant']}>
+                    <ListingForm />
+                  </Guard>
+                }
+              />
+              <Route
+                path="/listings/:id/edit"
+                element={
+                  <Guard roles={['restaurant']}>
+                    <ListingForm />
+                  </Guard>
+                }
+              />
+              <Route path="/listings/:id" element={<ListingDetail />} />
+              <Route
+                path="/organization"
+                element={
+                  <Guard roles={['restaurant', 'ngo']}>
+                    <OrganizationPage />
+                  </Guard>
+                }
+              />
+              <Route path="/impact" element={<Impact />} />
+              <Route path="*" element={<Pending />} />
+            </Routes>
+          </Suspense>
         </main>
         <footer className="mx-auto flex max-w-6xl flex-wrap justify-between gap-3 border-t border-stone-200 px-5 py-7 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">
           <span>ReplateAI · Good food belongs on a table.</span>

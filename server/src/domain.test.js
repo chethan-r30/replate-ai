@@ -361,4 +361,81 @@ describe('core domain', () => {
     expect(parsed.status).toBe(200);
     expect(parsed.body.data.mode).toBe('manual');
   });
+  it('reports only completed impact and protects notifications/admin routes', async () => {
+    await post();
+    const empty = await request(app).get('/api/v1/analytics/public');
+    expect(empty.body.data.mealsSaved).toBe(0);
+    await FoodListing.updateMany(
+      {},
+      { $set: { status: 'picked_up', unit: 'kg', quantity: 2 } },
+    );
+    const impact = await request(app).get('/api/v1/analytics/public');
+    expect(impact.body.data.mealsSaved).toBe(10);
+    expect(impact.body.data.kgSaved).toBe(2);
+    const n = await Notification.create({
+      user: ngo.user._id,
+      type: 'test',
+      message: 'Private',
+    });
+    expect((await request(app).get('/api/v1/notifications')).status).toBe(401);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/notifications/${n._id}/read`)
+          .set('Authorization', ngo2.auth)
+          .send({})
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/notifications/${n._id}/read`)
+          .set('Authorization', ngo.auth)
+          .send({})
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/analytics/admin')
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/admin/users')
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(403);
+  });
+  it('cannot disable any admin, including self or the last other admin', async () => {
+    await User.updateOne(
+      { _id: restaurant.user._id },
+      { $set: { role: 'admin' } },
+    );
+    const other = await User.create({
+      name: 'Other Admin',
+      email: 'other-admin@example.com',
+      role: 'admin',
+      passwordHash: 'unused',
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/admin/users/${restaurant.user._id}`)
+          .set('Authorization', restaurant.auth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/admin/users/${other._id}`)
+          .set('Authorization', restaurant.auth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(403);
+    expect((await User.findById(other._id)).deletedAt).toBeUndefined();
+  });
 });

@@ -8,6 +8,7 @@ export default defineConfig({
       'scripts/**/*.test.js',
       'server/**/*.test.js',
       'client/**/*.test.jsx',
+      'client/**/*.test.js',
     ],
     coverage: { provider: 'v8', include: ['server/src/services/**/*.js'] },
   },
