@@ -16,6 +16,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint && npm test && npm run build
+      - run: cp server/.env.example server/.env && cp client/.env.example client/.env
       - run: docker compose config --quiet
       - run: docker build -f server/Dockerfile -t replate-api .
       - run: docker build -f client/Dockerfile -t replate-web .
