@@ -1055,6 +1055,49 @@ describe('core domain', () => {
       1,
     );
   });
+  it('a blocked batch does not block an independent batch or acknowledge before commit', async () => {
+    const listings = await FoodListing.insertMany(
+      [1, 2, 3, 4].map(() => ({ ...food(), restaurant: restaurant.org._id })),
+    );
+    const original = Claim.collection.insertMany.bind(Claim.collection);
+    let release, entered;
+    const enteredGate = new Promise((resolve) => {
+      entered = resolve;
+    });
+    const blocked = new Promise((resolve) => {
+      release = resolve;
+    });
+    const spy = vi
+      .spyOn(Claim.collection, 'insertMany')
+      .mockImplementationOnce(async (...args) => {
+        entered();
+        await blocked;
+        return original(...args);
+      });
+    let firstFinished = false;
+    const first = Promise.all(
+      listings.slice(0, 2).map((x) => createClaim(x._id, ngo.org)),
+    ).then((value) => {
+      firstFinished = true;
+      return value;
+    });
+    try {
+      await enteredGate;
+      await Promise.all(
+        listings.slice(2).map((x) => createClaim(x._id, ngo2.org)),
+      );
+      expect(firstFinished).toBe(false);
+      expect(await Claim.countDocuments()).toBe(2);
+    } finally {
+      release();
+      await first;
+      spy.mockRestore();
+    }
+    expect(await Claim.countDocuments()).toBe(4);
+    expect(await Notification.countDocuments({ type: 'claim-request' })).toBe(
+      4,
+    );
+  });
   it('microbatch-generated claims and notices preserve timestamps and valid pickup codes', async () => {
     const listings = await FoodListing.insertMany(
       [1, 2].map(() => ({ ...food(), restaurant: restaurant.org._id })),
