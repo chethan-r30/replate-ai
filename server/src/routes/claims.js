@@ -1,7 +1,6 @@
 import { profile } from '../lib/profile.js';
 import { trackBackground } from '../services/background.js';
 // Only approved NGOs claim; only the restaurant confirms the NGO's pickup code.
-import { batchRead } from '../services/read-batch.js';
 import { Router } from 'express';
 import { sendNotification } from '../services/notifications.js';
 import { logger } from '../lib/logger.js';
@@ -18,15 +17,6 @@ import {
   pagination,
 } from '../middleware/auth.js';
 import { AppError, asyncRoute, ok } from '../middleware/errors.js';
-const readNgo = batchRead(
-  (ids) =>
-    Organization.find({
-      owner: { $in: ids },
-      type: 'ngo',
-      verificationStatus: 'approved',
-    }).lean(),
-  (org) => org.owner,
-);
 export function claimRoutes(config) {
   const r = Router();
   r.use(requireAuth(config));
@@ -61,7 +51,7 @@ export function claimRoutes(config) {
         .strict()
         .parse(req.body);
       const ngoStart = performance.now();
-      const ngo = await readNgo(req.user._id);
+      const ngo = req.approvedClaimNgo;
       profile('ngo-read', performance.now() - ngoStart);
       if (!ngo) throw new AppError(403, 'Approved NGO required');
       const queueStart = performance.now();
