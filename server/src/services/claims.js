@@ -150,7 +150,7 @@ async function transitionClaim(claimId, user, action, code) {
   return safe;
 }
 
-// MongoDB 8 transactionAsyncLocalStorage attaches every operation to this transaction.
+// Mongoose AsyncLocalStorage attaches ODM operations to the current transaction.
 mongoose.set('transactionAsyncLocalStorage', true);
 // A short process-local microbatch shares database round trips, never acknowledges
 // until its transaction commits. A process crash loses only unanswered requests.

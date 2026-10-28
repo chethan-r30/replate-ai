@@ -348,6 +348,49 @@ describe('core domain', () => {
     );
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
   });
+  it('drains claim-update owner lookup before background cleanup completes', async () => {
+    const listing = await post();
+    const claimed = await request(app)
+      .post('/api/v1/claims')
+      .set('Authorization', ngo.auth)
+      .send({ listingId: listing._id });
+    await drainBackground();
+    const original = Organization.find.bind(Organization);
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const spy = vi
+      .spyOn(Organization, 'find')
+      .mockImplementation((...args) => ({
+        select: async (...fields) => {
+          await gate;
+          return original(...args).select(...fields);
+        },
+      }));
+    try {
+      const approved = await request(app)
+        .post(`/api/v1/claims/${claimed.body.data._id}/approve`)
+        .set('Authorization', restaurant.auth)
+        .send({});
+      expect(approved.status).toBe(200);
+      let drained = false;
+      const draining = drainBackground().then(() => {
+        drained = true;
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(drained).toBe(false);
+      release();
+      await draining;
+      expect(await Notification.countDocuments({ type: 'claim-update' })).toBe(
+        2,
+      );
+    } finally {
+      release();
+      spy.mockRestore();
+      await drainBackground();
+    }
+  });
   it('ranks geo candidates and notifies each NGO at most once', async () => {
     const listing = await FoodListing.create({
       ...food(),
