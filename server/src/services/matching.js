@@ -25,8 +25,9 @@ export async function recommendations(
     { $limit: 200 },
   ]);
   if (!candidates.length) return [];
-  const day = new Date();
-  day.setUTCHours(0, 0, 0, 0);
+  const now = new Date();
+  // Per-NGO local calendar days can start up to 26 hours apart.
+  const day = new Date(now.getTime() - 48 * 3600000);
   const totals = await Claim.aggregate([
     {
       $match: {
@@ -44,9 +45,28 @@ export async function recommendations(
       },
     },
     { $unwind: '$food' },
-    { $group: { _id: '$ngo', servings: { $sum: '$food.servings' } } },
+    { $project: { ngo: 1, createdAt: 1, servings: '$food.servings' } },
   ]);
-  const used = new Map(totals.map((x) => [String(x._id), x.servings]));
+  const used = new Map();
+  for (const candidate of candidates) {
+    const localDay = (date) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: candidate.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(date);
+    const id = String(candidate._id);
+    used.set(
+      id,
+      totals
+        .filter(
+          (x) =>
+            String(x.ngo) === id && localDay(x.createdAt) === localDay(now),
+        )
+        .reduce((sum, x) => sum + x.servings, 0),
+    );
+  }
   return rankMatches(
     listing,
     candidates.map((x) => ({

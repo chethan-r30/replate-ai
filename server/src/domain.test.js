@@ -743,4 +743,37 @@ describe('core domain', () => {
     ).toBe(200);
     expect(canTransition('unknown', 'approved')).toBe(false);
   });
+  it('subtracts allocated capacity on each NGO local day, not a UTC day', async () => {
+    const instant = new Date('2026-10-29T00:30:00+05:30');
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+      bestBefore: new Date(instant.getTime() + 7200000),
+      pickupWindow: {
+        start: instant,
+        end: new Date(instant.getTime() + 3600000),
+      },
+    });
+    await Claim.create({
+      listing: listing._id,
+      ngo: ngo.org._id,
+      restaurant: restaurant.org._id,
+      status: 'picked_up',
+      createdAt: new Date('2026-10-28T23:00:00+05:30'),
+    });
+    await Organization.updateOne(
+      { _id: ngo.org._id },
+      { $set: { capacity: 10 } },
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(instant);
+    try {
+      const matches = await recommendations(listing);
+      expect(matches.some((x) => String(x._id) === String(ngo.org._id))).toBe(
+        true,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
