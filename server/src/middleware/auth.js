@@ -10,7 +10,7 @@ export const requireAuth = (config) =>
     );
     if (!match) throw new AppError(401, 'Sign in required');
     const token = verifyToken(match[1], 'access', config);
-    const user = await User.findOne({ _id: token.sub, deletedAt: null });
+    const user = await User.findOne({ _id: token.sub, deletedAt: null }).lean();
     if (!user) throw new AppError(401, 'Sign in required');
     req.user = user;
     next();

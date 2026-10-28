@@ -1,19 +1,20 @@
+import { fork } from 'node:child_process';
 // Disposable local load test. Never points at or modifies a production database.
 import autocannon from 'autocannon';
 import mongoose from 'mongoose';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { writeFile, mkdir } from 'node:fs/promises';
-import { createApp } from '../../server/src/app.js';
 import { parseEnv } from '../../server/src/config/env.js';
 import { User } from '../../server/src/models/User.js';
 import { Organization } from '../../server/src/models/Organization.js';
 import { FoodListing } from '../../server/src/models/FoodListing.js';
 import { Claim } from '../../server/src/models/Claim.js';
 import { signAccess } from '../../server/src/lib/tokens.js';
+const connections = Number(process.env.LOAD_CONNECTIONS || 200);
 const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 let server;
 try {
-  await mongoose.connect(mongo.getUri());
+  await mongoose.connect(mongo.getUri(), { maxPoolSize: 250, minPoolSize: 20 });
   await Promise.all([
     User.init(),
     Organization.init(),
@@ -67,9 +68,20 @@ try {
       location: restaurant.location,
     })),
   );
-  server = createApp(config).listen(0);
-  await new Promise((r) => server.once('listening', r));
-  const url = 'http://localhost:' + server.address().port;
+  server = fork(new URL('./load-server.mjs', import.meta.url), [], {
+    env: {
+      ...process.env,
+      ...Object.fromEntries(
+        Object.entries(config).map(([k, v]) => [k, String(v)]),
+      ),
+    },
+    stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+  });
+  const { port } = await new Promise((resolve, reject) => {
+    server.once('message', resolve);
+    server.once('error', reject);
+  });
+  const url = 'http://localhost:' + port;
   const run = (options) =>
     new Promise((resolve, reject) => {
       const times = [];
@@ -83,14 +95,19 @@ try {
     });
   const search = await run({
     url: url + '/api/v1/listings?lat=12.97&lng=77.59&limit=20',
-    connections: 200,
+    connections,
     duration: 10,
   });
   // Each request claims its own listing. A separate same-listing race is checked by integration tests.
   let next = 0;
+  await Promise.all(
+    Array.from({ length: 200 }, () =>
+      mongoose.connection.db.command({ ping: 1 }),
+    ),
+  );
   const claim = await run({
     url,
-    connections: 200,
+    connections,
     amount: 200,
     requests: [
       {
@@ -111,7 +128,7 @@ try {
   });
   function summary(r) {
     return {
-      connections: 200,
+      connections,
       requests: r.requests.total,
       p95Ms: r.measuredP95,
       p50Ms: r.latency.p50,
@@ -126,7 +143,8 @@ try {
   const output = {
     measuredAt: new Date().toISOString(),
     environment:
-      'Disposable single-node local Mongo replica set, Node ' + process.version,
+      'Disposable single-node Mongo replica set; API and load generator in separate processes; Node ' +
+      process.version,
     search: summary(search),
     claim: summary(claim),
     persistedClaims: await Claim.countDocuments(),
@@ -134,13 +152,22 @@ try {
   };
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/load.json', JSON.stringify(output, null, 2));
+  if (process.env.GITHUB_STEP_SUMMARY)
+    await writeFile(
+      process.env.GITHUB_STEP_SUMMARY,
+      `### 200-connection load evidence\n\nSearch p95: ${output.search.p95Ms.toFixed(2)}ms. Claim p95: ${output.claim.p95Ms.toFixed(2)}ms. Persisted claims: ${output.persistedClaims}. Errors: ${output.search.errors + output.claim.errors}.\n\nLatency target: below 300ms. This job records measurement; it does not turn a missed target into a pass.\n`,
+      { flag: 'a' },
+    );
   console.log(JSON.stringify(output, null, 2));
   if ((await Claim.countDocuments()) !== 200)
     throw new Error('Distinct-listing load fixture failed');
   if (search.errors || search.non2xx || claim.errors || claim.non2xx)
     throw new Error('Unexpected load response failures');
 } finally {
-  if (server) await new Promise((r) => server.close(r));
+  if (server) {
+    server.send('stop');
+    await new Promise((r) => server.once('exit', r));
+  }
   await mongoose.disconnect();
   await mongo.stop();
 }

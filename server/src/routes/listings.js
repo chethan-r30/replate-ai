@@ -1,6 +1,7 @@
 // Public safe listing reads; only approved restaurant owners may mutate listings.
 import mongoose from 'mongoose';
 import { SurplusHistory } from '../models/SurplusHistory.js';
+import { cached, cache, clearCache } from '../services/cache.js';
 import { Router } from 'express';
 import { notifyMatches } from '../services/matching.js';
 import { logger } from '../lib/logger.js';
@@ -21,6 +22,12 @@ export function listingRoutes(config) {
   const auth = requireAuth(config);
   const search = asyncRoute(async (req, res) => {
     const v = searchSchema.parse(req.query);
+    const cacheKey = 'search:' + JSON.stringify(v);
+    const existing = cached(cacheKey);
+    if (existing) {
+      res.set('Cache-Control', 'public, max-age=1');
+      return ok(res, existing);
+    }
     const match = {
       status: 'available',
       bestBefore: { $gt: new Date() },
@@ -52,7 +59,12 @@ export function listingRoutes(config) {
         .limit(v.limit)
         .select('-reservedBy -activeClaim -notifiedOrgs')
         .lean();
-    ok(res, { items: data, page: v.page, limit: v.limit });
+    // One-second browse cache is advisory only; claim always validates live state.
+    res.set('Cache-Control', 'public, max-age=1');
+    ok(
+      res,
+      cache(cacheKey, { items: data, page: v.page, limit: v.limit }, 1000),
+    );
   });
   r.get('/', search);
   r.get('/nearby', search);
@@ -83,6 +95,7 @@ export function listingRoutes(config) {
         .select('-reservedBy -activeClaim -notifiedOrgs')
         .lean();
       if (!listing) throw new AppError(404, 'Listing not found');
+      clearCache();
       ok(res, listing);
     }),
   );
@@ -113,6 +126,7 @@ export function listingRoutes(config) {
         });
         return created;
       });
+      clearCache();
       ok(res, listing, 201);
       notifyMatches(listing._id).catch(() =>
         logger.warn('Matching notifications delayed'),
@@ -148,6 +162,7 @@ export function listingRoutes(config) {
         );
         return changed;
       });
+      clearCache();
       ok(res, listing);
     }),
   );
@@ -170,6 +185,7 @@ export function listingRoutes(config) {
       );
       if (!listing)
         throw new AppError(409, 'Only available listings may be cancelled');
+      clearCache();
       ok(res, listing);
     }),
   );

@@ -1,3 +1,4 @@
+import { clearCache } from './cache.js';
 // Reserve exactly one listing. Compensation restores state if claim persistence fails.
 import mongoose from 'mongoose';
 import { randomInt, timingSafeEqual } from 'node:crypto';
@@ -147,10 +148,16 @@ async function transitionClaim(claimId, user, action, code) {
 // MongoDB 8 transactionAsyncLocalStorage attaches every operation to this transaction.
 mongoose.set('transactionAsyncLocalStorage', true);
 export async function createClaim(listingId, ngo) {
-  return mongoose.connection.transaction(() => reserveClaim(listingId, ngo));
+  const claim = await mongoose.connection.transaction(() =>
+    reserveClaim(listingId, ngo),
+  );
+  clearCache();
+  return claim;
 }
 export async function changeClaim(claimId, user, action, code) {
-  return mongoose.connection.transaction(() =>
+  const claim = await mongoose.connection.transaction(() =>
     transitionClaim(claimId, user, action, code),
   );
+  clearCache();
+  return claim;
 }

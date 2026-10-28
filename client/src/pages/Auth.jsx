@@ -138,7 +138,7 @@ export default function AuthPage({ mode }) {
               <option value="ngo">NGO</option>
               <option value="volunteer">Volunteer</option>
             </select>
-            <p className="mt-3 text-sm text-stone-500">
+            <p className="mt-3 text-sm text-stone-600 dark:text-stone-400">
               Restaurants and NGOs need email verification and admin approval
               before posting or claiming.
             </p>

@@ -1,4 +1,5 @@
 // Derive impact from completed pickups, never invented counters.
+import { sharedGet, sharedSet } from '../services/shared-cache.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { FoodListing } from '../models/FoodListing.js';
@@ -43,7 +44,11 @@ export function analyticsRoutes(config) {
     asyncRoute(async (req, res) => {
       z.object({}).strict().parse(req.query);
       res.set('Cache-Control', 'public, max-age=60');
-      ok(res, await impact());
+      const existing = await sharedGet('impact:public');
+      ok(
+        res,
+        existing || (await sharedSet('impact:public', await impact(), 60000)),
+      );
     }),
   );
   r.get(

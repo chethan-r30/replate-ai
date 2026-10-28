@@ -52,7 +52,7 @@ export function claimRoutes(config) {
         owner: req.user._id,
         type: 'ngo',
         verificationStatus: 'approved',
-      });
+      }).lean();
       if (!ngo) throw new AppError(403, 'Approved NGO required');
       const claim = await createClaim(listingId, ngo);
       ok(res, claim, 201);

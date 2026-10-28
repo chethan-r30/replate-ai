@@ -1,3 +1,4 @@
+import { clearCache } from './services/cache.js';
 import { recommendations, notifyMatches } from './services/matching.js';
 import { SurplusHistory } from './models/SurplusHistory.js';
 import { Notification } from './models/Notification.js';
@@ -97,6 +98,7 @@ afterAll(async () => {
   await mongo.stop();
 });
 beforeEach(async () => {
+  clearCache();
   await Promise.all(
     Object.values(mongoose.connection.collections).map((c) => c.deleteMany({})),
   );
@@ -374,6 +376,7 @@ describe('core domain', () => {
       {},
       { $set: { status: 'picked_up', unit: 'kg', quantity: 2 } },
     );
+    clearCache();
     const impact = await request(app).get('/api/v1/analytics/public');
     expect(impact.body.data.mealsSaved).toBe(10);
     expect(impact.body.data.kgSaved).toBe(2);

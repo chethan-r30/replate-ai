@@ -9,7 +9,7 @@ import { SurplusHistory } from '../models/SurplusHistory.js';
 import { forecast, demandForecast } from '../ai/forecast.js';
 import { parseInput, parseListing, forecastInsight } from '../ai/parser.js';
 import { recommendations } from '../services/matching.js';
-import { cached, cache } from '../services/cache.js';
+import { sharedGet, sharedSet } from '../services/shared-cache.js';
 import { requireAuth, requireRole, objectId } from '../middleware/auth.js';
 import { AppError, asyncRoute, ok } from '../middleware/errors.js';
 export function aiRoutes(config) {
@@ -58,7 +58,7 @@ export function aiRoutes(config) {
       const org = await Organization.findOne({ owner: req.user._id });
       if (!org) throw new AppError(400, 'Create an organization first');
       const key = `forecast:${org._id}:${category}`;
-      let result = cached(key);
+      let result = await sharedGet(key);
       if (!result) {
         const history = await SurplusHistory.find({
           restaurant: org._id,
@@ -98,7 +98,7 @@ export function aiRoutes(config) {
           categoryAverage: 0,
           timezone: org.timezone,
         });
-        result = cache(key, {
+        result = await sharedSet(key, {
           ...numeric,
           demand,
           insight: await forecastInsight(numeric, config),
