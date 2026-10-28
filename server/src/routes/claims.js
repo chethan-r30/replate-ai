@@ -17,6 +17,8 @@ import {
   pagination,
 } from '../middleware/auth.js';
 import { AppError, asyncRoute, ok } from '../middleware/errors.js';
+// Compile stable validators once, rather than allocating Zod graphs per claim.
+const claimBody = z.object({ listingId: objectId }).strict();
 export function claimRoutes(config) {
   const r = Router();
   r.use(requireAuth(config));
@@ -46,10 +48,7 @@ export function claimRoutes(config) {
     requireRole('ngo'),
     requireVerified,
     asyncRoute(async (req, res) => {
-      const { listingId } = z
-        .object({ listingId: objectId })
-        .strict()
-        .parse(req.body);
+      const { listingId } = claimBody.parse(req.body);
       const ngoStart = performance.now();
       const ngo = req.approvedClaimNgo;
       profile('ngo-read', performance.now() - ngoStart);
@@ -83,18 +82,25 @@ export function claimRoutes(config) {
         'no-show': 'no_show',
       };
       const claim = await changeClaim(id, req.user, mapped[action], body.code);
+      // Register the whole continuation before responding. Tracking only the
+      // inserts after an awaited owner lookup leaves shutdown/test drain blind.
+      trackBackground(
+        (async () => {
+          const orgs = await Organization.find({
+            _id: { $in: [claim.ngo, claim.restaurant] },
+          }).select('owner');
+          await Promise.all(
+            orgs.map((org) =>
+              sendNotification(
+                org.owner,
+                'claim-update',
+                `Food claim status: ${claim.status}.`,
+              ),
+            ),
+          );
+        })(),
+      ).catch(() => logger.warn('Claim notification delayed'));
       ok(res, claim);
-      const orgs = await Organization.find({
-        _id: { $in: [claim.ngo, claim.restaurant] },
-      }).select('owner');
-      for (const org of orgs)
-        trackBackground(
-          sendNotification(
-            org.owner,
-            'claim-update',
-            `Food claim status: ${claim.status}.`,
-          ),
-        ).catch(() => logger.warn('Claim notification delayed'));
     }),
   );
   r.post(

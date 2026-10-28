@@ -1,6 +1,6 @@
 # Deployment runbook
 
-Status: Phase9 in progress. No live ReplateAI deployment exists yet. Existing Vercel Hobby and Render workspaces are accessible; Vercel updated terms await owner review. Atlas Google sign-in awaits the owner's secure login. No service purchase or new legal acceptance is authorized.
+Status: Phase9 in progress. Main contains the application after checked release PR12, but its postmerge performance trial reopened the gate. A Free Render service is provisioned, with its initial build cancelled until configuration and release checks are ready. No working live demo has passed verification. Vercel terms acknowledgement is completed with optional training OFF, and Atlas Google sign-in works. Free-demo scope was accepted; no paid upgrades or payment methods may be added.
 
 ## Architecture and current hosting limits
 
@@ -20,14 +20,14 @@ https://www.mongodb.com/docs/atlas/tutorial/deploy-free-tier-cluster/
 https://www.mongodb.com/docs/atlas/connect-to-database-deployment/
 
 1. Create an isolated ReplateAI demo project/Free cluster only after reviewing its current limits/terms. Do not enable paid upgrades or sample data silently.
-2. Create a database user separate from the Atlas account, restricted to readWrite on the replate_demo database. Store the generated password in a secret manager, never Git or chat.
+2. Create a database user separate from the Atlas account, restricted to readWrite on the replate database. Store the generated password in a secret manager, never Git or chat.
 3. Add the Render service's verified outbound IP ranges to Network Access. Add your exact local IP temporarily only if seeding locally, then remove it. Do not default to0.0.0.0/0.
-4. Connect > Drivers > Node.js. Put the credentialed URI with database replate_demo into Render MONGODB_URI securely. Percent-encode password characters. Do not paste it into documentation or logs.
+4. Connect > Drivers > Node.js. Put the credentialed URI with database replate into Render MONGODB_URI securely. Percent-encode password characters. Do not paste it into documentation or logs.
 5. Wait for ready state and verify transactions/index initialization using /api/v1/ready. Production requires a replica set, not standalone Mongo.
 
 ## 2. Render API
 
-render.yaml is a template, not proof of deployment. It specifies main, checksPass deploys, Docker, /api/v1/health and Free plan for review. Do not apply it until the owner chooses acceptable hosting behavior/cost. Current main is bootstrap until final release; do not deploy bootstrap as the app.
+render.yaml is a template, not proof of deployment. It specifies main, checksPass deploys, Docker, /api/v1/health and Free plan for review. The owner accepted free-demo sleep/reminder/email limits. Main now contains the app, but activation remains held for the current numerical performance gate and complete configuration.
 
 Set these in Render environment settings, not committed files:
 
@@ -43,7 +43,7 @@ The backend rejects non-HTTPS production requests and trusts one proxy hop. Veri
 
 ## 3. Vercel frontend and same-origin auth
 
-1. Review the existing workspace terms/privacy notice yourself. Keep optional model-training/data-sharing OFF unless you explicitly choose it. No acknowledgement is implied by this runbook.
+1. The owner approved acknowledgement of the updated terms/privacy notice with optional training/data-sharing OFF. The dashboard confirmed Opted out. Keep that setting OFF.
 2. Import chethan-r30/replate-ai into the existing personal Hobby workspace, repository root. Use vercel.json: npm ci, npm run build -w client, output client/dist. Production branch main. No paid upgrade.
 3. Once the API origin is real, run locally:
 
@@ -89,7 +89,7 @@ Before a rollback, inspect database compatibility: code rollback does not undo c
 
 ## Still pending
 
-Owner Vercel notice review, Google/Atlas access, verified database/network setup, hosting plan/scheduler/email decision, service creation, real origin proxy configuration, release to main, live smoke/browser pickup flow and final docs. No live URLs or production-ready claim yet.
+Current release performance gate, final Vercel project/origin, Render CLIENT_URL, Atlas one-time seed, live API readiness, same-origin proxy/auth/socket/browser pickup verification and Phase10 final docs/fresh-clone checks. Claude/Cloudinary/SMTP still need real service keys. No production-ready claim.
 
 ### Provisioning checkpoint (2026-10-28)
 
@@ -100,3 +100,11 @@ The user approved acknowledgement of Vercel's updated terms/privacy notice with 
 Latest CI performance regressions reopen the release gate despite earlier passes. See PERFORMANCE.md. Real API origin, database-scoped credentials/allowlist, working external email/image credentials and live smoke/demo remain outstanding. The Free Render scheduler/sleep/SMTP limitations described above remain unresolved; no paid plan was authorized.
 
 Free-demo scope approved: keep Vercel frontend, Atlas Free and Render Free, synthetic verified accounts only, with explicit sleep/reminder/email caveats. Set VITE_DEMO_MODE=true for the deployed frontend to display these limitations and warn against entering real personal data. Render billing inspection confirmed Hobby, no card on file, current$0charges,15/25services and ample included runtime/bandwidth/build capacity. No card or billing setting was added. Without a payment method, documented quota behavior is suspension/build stop, not automatic payment. This check must be repeated before service creation; do not add payment details. Shared workspace quotas still matter to existing services. Atlas replate_app now has readWrite@replate only, restricted to ReplateAI; password stored securely, no network allowlist yet.
+
+### Provisioning continuation (2026-10-28)
+
+Render service: https://dashboard.render.com/web/srv-dbh3g761egvs739c2vp0/settings . Assigned API origin https://replate-api.onrender.com/ is not yet a verified working API. Singapore, Docker ./server/Dockerfile, root context, main, Free $0, health /api/v1/health, auto-deploy After CI Checks Pass. First automatic build was cancelled while required configuration was incomplete. No card was added; no paid add-ons or preview instances. Billing was rechecked Hobby/no card/low shared usage before creation.
+
+Atlas IP Access List now contains only the two Render Singapore egress ranges shown by this service:74.220.52.0/24 and74.220.60.0/24, both Active. They are shared regional ranges, not dedicated addresses. No0.0.0.0/0 entry. User replate_app remains readWrite@replate, restricted to ReplateAI. The actual Node driver URI was acquired and its credentialed version saved directly in Render without printing it. Separate JWT secrets were generated in Render and saved. CLIENT_URL still awaits the actual final Vercel origin. Nonsecret NODE_ENV/PORT/expiry/model values are saved. No seed-machine IP or demo data has been added yet; one-time seed credential use awaits owner approval.
+
+The frontend proxy config uses the actual Render origin and stays ahead of SPA fallback. Vercel import was inspected with Vite, repository root, npm ci, npm run build -w client, client/dist; demo/API/socket public variables were prepared but the form was not submitted. Re-enter them on the next import. Do not send an assigned or frontend-only URL as a completed demo.
