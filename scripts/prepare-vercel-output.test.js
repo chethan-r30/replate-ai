@@ -14,6 +14,7 @@ it('preserves proxy, SPA and root security headers without copying private files
   const config = JSON.parse(await readFile('vercel.json', 'utf8'));
   const output = staticConfig(config);
   expect(output.version).toBe(3);
+  expect(config.git.deploymentEnabled).toBe(false);
   expect(new RegExp(output.routes[0].src).test('/')).toBe(true);
   expect(output.routes[0].headers['Content-Security-Policy']).toContain(
     "default-src 'self'",
