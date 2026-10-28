@@ -83,18 +83,25 @@ export function claimRoutes(config) {
         'no-show': 'no_show',
       };
       const claim = await changeClaim(id, req.user, mapped[action], body.code);
+      // Register the whole continuation before responding. Tracking only the
+      // inserts after an awaited owner lookup leaves shutdown/test drain blind.
+      trackBackground(
+        (async () => {
+          const orgs = await Organization.find({
+            _id: { $in: [claim.ngo, claim.restaurant] },
+          }).select('owner');
+          await Promise.all(
+            orgs.map((org) =>
+              sendNotification(
+                org.owner,
+                'claim-update',
+                `Food claim status: ${claim.status}.`,
+              ),
+            ),
+          );
+        })(),
+      ).catch(() => logger.warn('Claim notification delayed'));
       ok(res, claim);
-      const orgs = await Organization.find({
-        _id: { $in: [claim.ngo, claim.restaurant] },
-      }).select('owner');
-      for (const org of orgs)
-        trackBackground(
-          sendNotification(
-            org.owner,
-            'claim-update',
-            `Food claim status: ${claim.status}.`,
-          ),
-        ).catch(() => logger.warn('Claim notification delayed'));
     }),
   );
   r.post(
