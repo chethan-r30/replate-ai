@@ -1,3 +1,4 @@
+import { trackBackground } from '../services/background.js';
 // Public safe listing reads; only approved restaurant owners may mutate listings.
 import mongoose from 'mongoose';
 import { SurplusHistory } from '../models/SurplusHistory.js';
@@ -128,7 +129,7 @@ export function listingRoutes(config) {
       });
       clearCache();
       ok(res, listing, 201);
-      notifyMatches(listing._id).catch(() =>
+      trackBackground(notifyMatches(listing._id)).catch(() =>
         logger.warn('Matching notifications delayed'),
       );
     }),

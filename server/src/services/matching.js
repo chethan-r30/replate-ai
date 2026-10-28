@@ -77,8 +77,9 @@ export async function recommendations(
   );
 }
 export async function notifyMatches(listingId) {
-  const delivered = [];
+  let delivered = [];
   const count = await mongoose.connection.transaction(async () => {
+    delivered = [];
     const listing = await FoodListing.findOne({
       _id: listingId,
       status: 'available',
@@ -107,7 +108,7 @@ export async function notifyMatches(listingId) {
         message: `Nearby surplus: ${listing.title}. Review the pickup window before claiming.`,
       })),
     );
-    delivered.push(...next);
+    delivered = next;
     return next.length;
   });
   for (const org of delivered) {

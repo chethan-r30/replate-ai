@@ -1,3 +1,4 @@
+import { trackBackground } from '../services/background.js';
 // Only approved NGOs claim; only the restaurant confirms the NGO's pickup code.
 import { batchRead } from '../services/read-batch.js';
 import { Router } from 'express';
@@ -92,10 +93,12 @@ export function claimRoutes(config) {
         _id: { $in: [claim.ngo, claim.restaurant] },
       }).select('owner');
       for (const org of orgs)
-        sendNotification(
-          org.owner,
-          'claim-update',
-          `Food claim status: ${claim.status}.`,
+        trackBackground(
+          sendNotification(
+            org.owner,
+            'claim-update',
+            `Food claim status: ${claim.status}.`,
+          ),
         ).catch(() => logger.warn('Claim notification delayed'));
     }),
   );

@@ -1,3 +1,4 @@
+import { drainBackground } from './services/background.js';
 import { clearCache } from './services/cache.js';
 import { recommendations, notifyMatches } from './services/matching.js';
 import { SurplusHistory } from './models/SurplusHistory.js';
@@ -7,6 +8,7 @@ import {
   beforeAll,
   afterAll,
   beforeEach,
+  afterEach,
   describe,
   it,
   expect,
@@ -97,6 +99,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await mongoose.disconnect();
   await mongo.stop();
+});
+afterEach(async () => {
+  await drainBackground();
 });
 beforeEach(async () => {
   clearCache();
