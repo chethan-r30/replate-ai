@@ -6,7 +6,7 @@ export default [
   { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**'] },
   js.configs.recommended,
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['**/*.{js,jsx,mjs}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -21,7 +21,7 @@ export default [
     },
   },
   {
-    files: ['client/**/*.{js,jsx}'],
+    files: ['client/**/*.{js,jsx,mjs}'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules,
   },

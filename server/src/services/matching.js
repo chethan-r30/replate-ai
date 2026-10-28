@@ -1,5 +1,8 @@
 // Query nearby approved NGOs and subtract today's allocated capacity.
 import mongoose from 'mongoose';
+import { sendPlainEmail } from '../lib/mail.js';
+import { notificationConfig } from './notifications.js';
+import { emitNotification } from './realtime.js';
 import { Organization } from '../models/Organization.js';
 import { Claim } from '../models/Claim.js';
 import { FoodListing } from '../models/FoodListing.js';
@@ -54,7 +57,8 @@ export async function recommendations(
   );
 }
 export async function notifyMatches(listingId) {
-  return mongoose.connection.transaction(async () => {
+  const delivered = [];
+  const count = await mongoose.connection.transaction(async () => {
     const listing = await FoodListing.findOne({
       _id: listingId,
       status: 'available',
@@ -83,6 +87,16 @@ export async function notifyMatches(listingId) {
         message: `Nearby surplus: ${listing.title}. Review the pickup window before claiming.`,
       })),
     );
+    delivered.push(...next);
     return next.length;
   });
+  for (const org of delivered) {
+    emitNotification(org.owner, { type: 'nearby-listing' });
+    await sendPlainEmail(
+      org.owner,
+      'Nearby surplus is available. Review your ReplateAI notifications and the food pickup window.',
+      notificationConfig(),
+    );
+  }
+  return count;
 }

@@ -40,6 +40,7 @@ const schema = new mongoose.Schema(
     aiMeta: { items: [String], safetyNotes: [String] },
     notifiedOrgs: [mongoose.Schema.Types.ObjectId],
     lastNotifiedAt: Date,
+    expiryReminderAt: Date,
   },
   { timestamps: true },
 );

@@ -1,5 +1,7 @@
 // Only approved NGOs claim; only the restaurant confirms the NGO's pickup code.
 import { Router } from 'express';
+import { sendNotification } from '../services/notifications.js';
+import { logger } from '../lib/logger.js';
 import { z } from 'zod';
 import { Claim } from '../models/Claim.js';
 import { Organization } from '../models/Organization.js';
@@ -52,7 +54,17 @@ export function claimRoutes(config) {
         verificationStatus: 'approved',
       });
       if (!ngo) throw new AppError(403, 'Approved NGO required');
-      ok(res, await createClaim(listingId, ngo), 201);
+      const claim = await createClaim(listingId, ngo);
+      ok(res, claim, 201);
+      const restaurant = await Organization.findById(claim.restaurant).select(
+        'owner',
+      );
+      if (restaurant)
+        sendNotification(
+          restaurant.owner,
+          'claim-request',
+          'A new food claim is waiting for your review.',
+        ).catch(() => logger.warn('Claim notification delayed'));
     }),
   );
   r.post(
@@ -77,7 +89,17 @@ export function claimRoutes(config) {
         cancel: 'cancelled',
         'no-show': 'no_show',
       };
-      ok(res, await changeClaim(id, req.user, mapped[action], body.code));
+      const claim = await changeClaim(id, req.user, mapped[action], body.code);
+      ok(res, claim);
+      const orgs = await Organization.find({
+        _id: { $in: [claim.ngo, claim.restaurant] },
+      }).select('owner');
+      for (const org of orgs)
+        sendNotification(
+          org.owner,
+          'claim-update',
+          `Food claim status: ${claim.status}.`,
+        ).catch(() => logger.warn('Claim notification delayed'));
     }),
   );
   r.post(
