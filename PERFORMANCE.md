@@ -40,3 +40,5 @@ Independent CI load measurement completed: https://github.com/chethan-r30/replat
 Automated axe WCAG2A/AA and2.1AA checks on mobile home/listings/login/impact found zero violations. Browser checks are a baseline, not a full accessibility audit.
 
 A single-query user/organization join was tested to shorten one permission lookup without caching. It did not improve claim p95 (1185ms) and was reverted. Profiling can be rerun with PROFILE_DB=1 npm run test:load. No repeated trial is warranted without a new hypothesis.
+
+A100ms notification burst-coalescing experiment reduced local claim p95 only to1011ms, still above target. The in-memory queue was not retained: crash-safe notification delivery would need a durable outbox, and a small latency gain does not justify introducing a loss window. Existing immediate persistence behavior is preserved.
