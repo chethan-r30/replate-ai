@@ -15,19 +15,27 @@ const readClaimIdentity = batchRead(
   async (ids) => {
     // One collection window, two parallel indexed reads. Both are fresh and
     // completed permission snapshots are never retained between requests.
+    const objectIds = ids.map((id) => new User.base.Types.ObjectId(id));
     const [users, ngos] = await Promise.all([
-      User.find({ _id: { $in: ids }, deletedAt: null })
-        .select('role isEmailVerified verificationStatus')
-        .batchSize(200)
-        .lean(),
-      Organization.find({
-        owner: { $in: ids },
-        type: 'ngo',
-        verificationStatus: 'approved',
-      })
-        .select('owner')
-        .batchSize(200)
-        .lean(),
+      User.collection
+        .find(
+          { _id: { $in: objectIds }, deletedAt: null },
+          {
+            projection: { role: 1, isEmailVerified: 1, verificationStatus: 1 },
+            batchSize: 1000,
+          },
+        )
+        .toArray(),
+      Organization.collection
+        .find(
+          {
+            owner: { $in: objectIds },
+            type: 'ngo',
+            verificationStatus: 'approved',
+          },
+          { projection: { owner: 1 }, batchSize: 1000 },
+        )
+        .toArray(),
     ]);
     const byOwner = new Map(ngos.map((ngo) => [String(ngo.owner), ngo]));
     return users.map((user) => ({
