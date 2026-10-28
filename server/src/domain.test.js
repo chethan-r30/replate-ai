@@ -776,4 +776,83 @@ describe('core domain', () => {
       vi.useRealTimers();
     }
   });
+  it('validates notification/admin writes and denies crossed roles', async () => {
+    const admin = await User.create({
+      name: 'Admin',
+      email: 'admin-validation@example.com',
+      role: 'admin',
+      passwordHash: 'unused',
+    });
+    const auth = `Bearer ${signAccess(admin, config)}`;
+    const listing = await post();
+    const notification = await Notification.create({
+      user: ngo.user._id,
+      type: 'test',
+      message: 'Private',
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/notifications/${notification._id}/read`)
+          .set('Authorization', ngo.auth)
+          .send({ extra: 1 })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/notifications')
+          .set('Authorization', ngo2.auth)
+      ).body.data.items.some((item) => item._id === String(notification._id)),
+    ).toBe(false);
+    for (const body of [{ reason: 'x' }, { reason: 'Valid', extra: 1 }])
+      expect(
+        (
+          await request(app)
+            .post(`/api/v1/admin/listings/${listing._id}/moderate`)
+            .set('Authorization', auth)
+            .send(body)
+        ).status,
+      ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/admin/listings/${listing._id}/moderate`)
+          .set('Authorization', ngo.auth)
+          .send({ reason: 'Valid' })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/admin/users/${ngo.user._id}`)
+          .set('Authorization', restaurant.auth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(403);
+    for (const [path, token] of [
+      ['restaurant', ngo.auth],
+      ['ngo', restaurant.auth],
+    ])
+      expect(
+        (
+          await request(app)
+            .get('/api/v1/analytics/' + path)
+            .set('Authorization', token)
+        ).status,
+      ).toBe(403);
+    expect(
+      (await request(app).get('/api/v1/analytics/public?extra=1')).status,
+    ).toBe(400);
+    expect((await request(app).get('/api/v1/listings/invalid')).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/uploads')
+          .set('Authorization', restaurant.auth)
+      ).status,
+    ).toBe(400);
+  });
 });
