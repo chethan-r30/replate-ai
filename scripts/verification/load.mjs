@@ -53,6 +53,30 @@ try {
       verificationStatus: 'approved',
     })),
   );
+  const extraUsers = await User.insertMany(
+    Array.from({ length: 199 }, (_, i) => ({
+      name: 'Load NGO ' + i,
+      email: `ngo${i}@load.example`,
+      role: 'ngo',
+      passwordHash: 'unused',
+      isEmailVerified: true,
+      verificationStatus: 'approved',
+    })),
+  );
+  await Organization.insertMany(
+    extraUsers.map((u) => ({
+      owner: u._id,
+      type: 'ngo',
+      name: 'Load NGO',
+      registrationNo: 'LOAD123',
+      address: '123 Test Road',
+      timezone: 'Asia/Kolkata',
+      location: { type: 'Point', coordinates: [77.59, 12.97] },
+      verificationDocs: ['https://example.com/proof'],
+      verificationStatus: 'approved',
+    })),
+  );
+  const claimUsers = [n, ...extraUsers];
   const now = Date.now();
   const docs = await FoodListing.insertMany(
     Array.from({ length: 200 }, (_, i) => ({
@@ -119,8 +143,13 @@ try {
           authorization: 'Bearer ' + signAccess(n, config),
         },
         setupRequest: (request) => {
+          const user = claimUsers[next];
           const listing = docs[next++];
           if (!listing) return null;
+          request.headers = {
+            ...request.headers,
+            authorization: 'Bearer ' + signAccess(user, config),
+          };
           request.body = JSON.stringify({ listingId: String(listing._id) });
           return request;
         },
@@ -155,6 +184,7 @@ try {
     search: summary(search),
     claim: summary(claim),
     persistedClaims: await Claim.countDocuments(),
+    distinctClaimingNgos: (await Claim.distinct('ngo')).length,
     reservedListings: await FoodListing.countDocuments({ status: 'reserved' }),
   };
   await mkdir('test-results', { recursive: true });
@@ -166,6 +196,8 @@ try {
       { flag: 'a' },
     );
   console.log(JSON.stringify(output, null, 2));
+  if ((await Claim.distinct('ngo')).length !== 200)
+    throw new Error('Distinct-user workload was not preserved');
   if ((await Claim.countDocuments()) !== 200)
     throw new Error('Distinct-listing load fixture failed');
   if (search.errors || search.non2xx || claim.errors || claim.non2xx)

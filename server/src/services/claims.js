@@ -168,7 +168,7 @@ export function createClaim(listingId, ngo) {
         // Bound each transaction; overlapping chunks still use compare-and-swap.
         for (let offset = 0; offset < batch.length; offset += 200)
           persistClaimBatch(batch.slice(offset, offset + 200));
-      }, 10);
+      }, 25);
     }
   });
 }
