@@ -10,6 +10,29 @@ export default defineConfig({
       'client/**/*.test.jsx',
       'client/**/*.test.js',
     ],
-    coverage: { provider: 'v8', include: ['server/src/services/**/*.js'] },
+    coverage: {
+      provider: 'v8',
+      include: [
+        'server/src/services/**/*.js',
+        'server/src/ai/**/*.js',
+        'client/src/**/*.{js,jsx}',
+      ],
+      exclude: ['**/*.test.*', 'client/src/main.jsx'],
+      reporter: ['text', 'json-summary', 'html'],
+      thresholds: {
+        'server/src/services/**': {
+          lines: 80,
+          statements: 80,
+          functions: 80,
+          branches: 80,
+        },
+        'client/src/**': {
+          lines: 70,
+          statements: 70,
+          functions: 70,
+          branches: 70,
+        },
+      },
+    },
   },
 });

@@ -1,4 +1,5 @@
 import { recommendations, notifyMatches } from './services/matching.js';
+import { SurplusHistory } from './models/SurplusHistory.js';
 import { Notification } from './models/Notification.js';
 // Verify geo queries, ownership, deadline gates and concurrent claim handover.
 import {
@@ -31,6 +32,7 @@ const config = parseEnv({
   RATE_LIMIT_MAX: 10000,
 });
 const app = createApp(config);
+const callRoute = (method, path) => request(app)[method]('/api/v1' + path);
 let mongo;
 let restaurant, ngo, ngo2;
 async function actor(role, email) {
@@ -211,6 +213,9 @@ describe('core domain', () => {
       ).status,
     ).toBe(200);
     expect((await FoodListing.findById(listing._id)).status).toBe('picked_up');
+    expect(
+      (await SurplusHistory.findOne({ listing: listing._id })).quantityClaimed,
+    ).toBe(10);
     expect(
       (
         await request(app)
@@ -437,5 +442,468 @@ describe('core domain', () => {
       ).status,
     ).toBe(403);
     expect((await User.findById(other._id)).deletedAt).toBeUndefined();
+  });
+  it('covers protected reads, strict validation, role denials and admin mutation success', async () => {
+    const listing = await post();
+    const admin = await User.create({
+      name: 'Admin',
+      email: 'admin-matrix@example.com',
+      role: 'admin',
+      passwordHash: 'unused',
+      isEmailVerified: true,
+      verificationStatus: 'approved',
+    });
+    const adminAuth = `Bearer ${signAccess(admin, config)}`;
+    const paths = [
+      '/organizations/mine',
+      '/organizations',
+      '/organizations/' + restaurant.org._id,
+      '/listings/mine',
+      '/claims/mine',
+      '/analytics/restaurant',
+      '/analytics/ngo',
+      '/analytics/admin',
+      '/notifications',
+      '/admin/users',
+      '/admin/audit',
+      '/ai/forecast',
+      '/ai/recommendations/' + listing._id,
+    ];
+    for (const path of paths)
+      expect(
+        (await request(app).get('/api/v1' + path)).status,
+        `GET ${path} unauthenticated`,
+      ).toBe(401);
+    for (const [path, auth] of [
+      ['/organizations', adminAuth],
+      ['/organizations/mine', restaurant.auth],
+      ['/organizations/' + restaurant.org._id, restaurant.auth],
+      ['/listings/mine', restaurant.auth],
+      ['/claims/mine', ngo.auth],
+      ['/analytics/restaurant', restaurant.auth],
+      ['/analytics/ngo', ngo.auth],
+      ['/analytics/admin', adminAuth],
+      ['/notifications', ngo.auth],
+      ['/admin/users', adminAuth],
+      ['/admin/audit', adminAuth],
+      ['/ai/forecast', restaurant.auth],
+      ['/ai/recommendations/' + listing._id, restaurant.auth],
+    ]) {
+      expect(
+        (
+          await request(app)
+            .get('/api/v1' + path)
+            .set('Authorization', auth)
+        ).status,
+        `GET ${path} success`,
+      ).toBe(200);
+    }
+    for (const path of [
+      '/organizations/mine',
+      '/listings/mine',
+      '/claims/mine',
+      '/notifications',
+      '/admin/users',
+      '/admin/audit',
+      '/analytics/admin',
+      '/ai/forecast',
+    ])
+      expect(
+        (
+          await request(app)
+            .get('/api/v1' + path + '?unexpected=value')
+            .set(
+              'Authorization',
+              path.startsWith('/admin') || path === '/analytics/admin'
+                ? adminAuth
+                : restaurant.auth,
+            )
+        ).status,
+        `GET ${path} validation`,
+      ).toBe(400);
+    for (const [method, path] of [
+      ['post', '/organizations'],
+      ['patch', '/organizations/' + restaurant.org._id],
+      ['post', '/organizations/' + restaurant.org._id + '/verify'],
+      ['patch', '/listings/' + listing._id],
+      ['delete', '/listings/' + listing._id],
+      ['post', '/claims'],
+      ['post', '/claims/507f1f77bcf86cd799439011/approve'],
+      ['post', '/claims/507f1f77bcf86cd799439011/feedback'],
+      ['post', '/uploads'],
+      ['post', '/ai/parse-listing'],
+      ['patch', '/notifications/507f1f77bcf86cd799439011/read'],
+      ['patch', '/admin/users/' + ngo.user._id],
+      ['post', '/admin/listings/' + listing._id + '/moderate'],
+    ])
+      expect(
+        (await callRoute(method, path).send({})).status,
+        `${method} ${path} unauthenticated`,
+      ).toBe(401);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/organizations/' + restaurant.org._id)
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/organizations/' + restaurant.org._id + '?extra=1')
+          .set('Authorization', restaurant.auth)
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/listings/' + listing._id)
+          .set('Authorization', restaurant.auth)
+          .send(food())
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/listings/' + listing._id)
+          .set('Authorization', ngo.auth)
+          .send(food())
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/listings/' + listing._id)
+          .set('Authorization', restaurant.auth)
+          .send({})
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .delete('/api/v1/listings/' + listing._id)
+          .set('Authorization', restaurant.auth)
+          .send({ extra: true })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .delete('/api/v1/listings/' + listing._id)
+          .set('Authorization', ngo.auth)
+          .send({})
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/claims')
+          .set('Authorization', restaurant.auth)
+          .send({ listingId: listing._id })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/claims')
+          .set('Authorization', ngo.auth)
+          .send({ listingId: 'bad' })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/ai/parse-listing')
+          .set('Authorization', restaurant.auth)
+          .send({})
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/ai/parse-listing')
+          .set('Authorization', ngo.auth)
+          .send({ note: 'Bread' })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/forecast')
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(403);
+    for (const data of [{ disabled: 'yes' }, { disabled: true, role: 'admin' }])
+      expect(
+        (
+          await request(app)
+            .patch('/api/v1/admin/users/' + ngo.user._id)
+            .set('Authorization', adminAuth)
+            .send(data)
+        ).status,
+      ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/admin/users/' + ngo.user._id)
+          .set('Authorization', adminAuth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/claims/mine')
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/admin/users/' + ngo.user._id)
+          .set('Authorization', adminAuth)
+          .send({ disabled: false })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/admin/listings/' + listing._id + '/moderate')
+          .set('Authorization', adminAuth)
+          .send({ reason: 'Unsafe food' })
+      ).status,
+    ).toBe(200);
+    expect((await FoodListing.findById(listing._id)).status).toBe('cancelled');
+    expect(
+      (await request(app).get('/api/v1/listings/' + listing._id)).status,
+    ).toBe(200);
+    expect(
+      (await request(app).get('/api/v1/listings/nearby?lat=12.97&lng=77.59'))
+        .status,
+    ).toBe(200);
+    const another = await post();
+    expect(
+      (
+        await request(app)
+          .delete('/api/v1/listings/' + another._id)
+          .set('Authorization', restaurant.auth)
+          .send({})
+      ).status,
+    ).toBe(200);
+  });
+  it('covers reject/no-show transitions, strict action inputs and feedback denials', async () => {
+    const listing = await post();
+    const c = (
+      await request(app)
+        .post('/api/v1/claims')
+        .set('Authorization', ngo.auth)
+        .send({ listingId: listing._id })
+    ).body.data;
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/claims/${c._id}/approve`)
+          .set('Authorization', restaurant.auth)
+          .send({ extra: true })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/claims/${c._id}/feedback`)
+          .set('Authorization', ngo.auth)
+          .send({ rating: 6 })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/claims/${c._id}/feedback`)
+          .set('Authorization', ngo.auth)
+          .send({ rating: 5 })
+      ).status,
+    ).toBe(409);
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/claims/${c._id}/reject`)
+          .set('Authorization', restaurant.auth)
+          .send({})
+      ).status,
+    ).toBe(200);
+    const d = (
+      await request(app)
+        .post('/api/v1/claims')
+        .set('Authorization', ngo.auth)
+        .send({ listingId: listing._id })
+    ).body.data;
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/claims/${d._id}/no-show`)
+          .set('Authorization', restaurant.auth)
+          .send({})
+      ).status,
+    ).toBe(200);
+    expect(canTransition('unknown', 'approved')).toBe(false);
+  });
+  it('subtracts allocated capacity on each NGO local day, not a UTC day', async () => {
+    const instant = new Date('2026-10-29T00:30:00+05:30');
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+      bestBefore: new Date(instant.getTime() + 7200000),
+      pickupWindow: {
+        start: instant,
+        end: new Date(instant.getTime() + 3600000),
+      },
+    });
+    await Claim.create({
+      listing: listing._id,
+      ngo: ngo.org._id,
+      restaurant: restaurant.org._id,
+      status: 'picked_up',
+      createdAt: new Date('2026-10-28T23:00:00+05:30'),
+    });
+    await Organization.updateOne(
+      { _id: ngo.org._id },
+      { $set: { capacity: 10 } },
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(instant);
+    try {
+      const matches = await recommendations(listing);
+      expect(matches.some((x) => String(x._id) === String(ngo.org._id))).toBe(
+        true,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('validates notification/admin writes and denies crossed roles', async () => {
+    const admin = await User.create({
+      name: 'Admin',
+      email: 'admin-validation@example.com',
+      role: 'admin',
+      passwordHash: 'unused',
+    });
+    const auth = `Bearer ${signAccess(admin, config)}`;
+    const listing = await post();
+    const notification = await Notification.create({
+      user: ngo.user._id,
+      type: 'test',
+      message: 'Private',
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/notifications/${notification._id}/read`)
+          .set('Authorization', ngo.auth)
+          .send({ extra: 1 })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/notifications')
+          .set('Authorization', ngo2.auth)
+      ).body.data.items.some((item) => item._id === String(notification._id)),
+    ).toBe(false);
+    for (const body of [{ reason: 'x' }, { reason: 'Valid', extra: 1 }])
+      expect(
+        (
+          await request(app)
+            .post(`/api/v1/admin/listings/${listing._id}/moderate`)
+            .set('Authorization', auth)
+            .send(body)
+        ).status,
+      ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post(`/api/v1/admin/listings/${listing._id}/moderate`)
+          .set('Authorization', ngo.auth)
+          .send({ reason: 'Valid' })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/admin/users/${ngo.user._id}`)
+          .set('Authorization', restaurant.auth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(403);
+    for (const [path, token] of [
+      ['restaurant', ngo.auth],
+      ['ngo', restaurant.auth],
+    ])
+      expect(
+        (
+          await request(app)
+            .get('/api/v1/analytics/' + path)
+            .set('Authorization', token)
+        ).status,
+      ).toBe(403);
+    expect(
+      (await request(app).get('/api/v1/analytics/public?extra=1')).status,
+    ).toBe(400);
+    expect((await request(app).get('/api/v1/listings/invalid')).status).toBe(
+      400,
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/uploads')
+          .set('Authorization', restaurant.auth)
+      ).status,
+    ).toBe(400);
+  });
+  it('rolls back listing post and expiry if related history/claim writes fail', async () => {
+    const history = vi
+      .spyOn(SurplusHistory, 'create')
+      .mockRejectedValueOnce(new Error('history failed'));
+    const failed = await request(app)
+      .post('/api/v1/listings')
+      .set('Authorization', restaurant.auth)
+      .send(food());
+    history.mockRestore();
+    expect(failed.status).toBe(500);
+    expect(await FoodListing.countDocuments()).toBe(0);
+    const listing = await post();
+    expect(
+      (await SurplusHistory.findOne({ listing: listing._id })).quantityPosted,
+    ).toBe(10);
+    const c = (
+      await request(app)
+        .post('/api/v1/claims')
+        .set('Authorization', ngo.auth)
+        .send({ listingId: listing._id })
+    ).body.data;
+    await FoodListing.updateOne(
+      { _id: listing._id },
+      { $set: { bestBefore: new Date(0) } },
+    );
+    const update = vi
+      .spyOn(Claim, 'updateOne')
+      .mockRejectedValueOnce(new Error('expiry failed'));
+    await expect(expireListings()).rejects.toThrow('expiry failed');
+    update.mockRestore();
+    expect((await FoodListing.findById(listing._id)).status).toBe('reserved');
+    expect((await Claim.findById(c._id)).status).toBe('requested');
+    expect(await expireListings()).toBe(1);
+    expect((await Claim.findById(c._id)).status).toBe('no_show');
+  });
+  it('updates forecast history on listing edits without duplicate records', async () => {
+    const listing = await post();
+    const r = await request(app)
+      .patch('/api/v1/listings/' + listing._id)
+      .set('Authorization', restaurant.auth)
+      .send({ ...food(), servings: 25, category: 'produce' });
+    expect(r.status).toBe(200);
+    const rows = await SurplusHistory.find({ listing: listing._id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].quantityPosted).toBe(25);
+    expect(rows[0].category).toBe('produce');
   });
 });

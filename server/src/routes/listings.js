@@ -1,4 +1,6 @@
 // Public safe listing reads; only approved restaurant owners may mutate listings.
+import mongoose from 'mongoose';
+import { SurplusHistory } from '../models/SurplusHistory.js';
 import { Router } from 'express';
 import { notifyMatches } from '../services/matching.js';
 import { logger } from '../lib/logger.js';
@@ -96,9 +98,20 @@ export function listingRoutes(config) {
         verificationStatus: 'approved',
       });
       if (!org) throw new AppError(403, 'Approved restaurant required');
-      const listing = await FoodListing.create({
-        ...data,
-        restaurant: org._id,
+      const listing = await mongoose.connection.transaction(async () => {
+        const created = await FoodListing.create({
+          ...data,
+          restaurant: org._id,
+        });
+        await SurplusHistory.create({
+          listing: created._id,
+          restaurant: org._id,
+          date: created.createdAt,
+          category: created.category,
+          quantityPosted: created.servings,
+          quantityClaimed: 0,
+        });
+        return created;
       });
       ok(res, listing, 201);
       notifyMatches(listing._id).catch(() =>
@@ -116,13 +129,25 @@ export function listingRoutes(config) {
       const data = listingSchema.parse(req.body);
       const org = await Organization.findOne({ owner: req.user._id });
       if (!org) throw new AppError(403, 'Organization required');
-      const listing = await FoodListing.findOneAndUpdate(
-        { _id: id, restaurant: org._id, status: 'available' },
-        { $set: data },
-        { new: true },
-      );
-      if (!listing)
-        throw new AppError(409, 'Only your available listings may be edited');
+      const listing = await mongoose.connection.transaction(async () => {
+        const changed = await FoodListing.findOneAndUpdate(
+          { _id: id, restaurant: org._id, status: 'available' },
+          { $set: data },
+          { new: true },
+        );
+        if (!changed)
+          throw new AppError(409, 'Only your available listings may be edited');
+        await SurplusHistory.updateOne(
+          { listing: id },
+          {
+            $set: {
+              category: changed.category,
+              quantityPosted: changed.servings,
+            },
+          },
+        );
+        return changed;
+      });
       ok(res, listing);
     }),
   );

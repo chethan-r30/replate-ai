@@ -2,6 +2,12 @@
 import mongoose from 'mongoose';
 const schema = new mongoose.Schema(
   {
+    listing: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FoodListing',
+      unique: true,
+      sparse: true,
+    },
     restaurant: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
     date: Date,
     dayOfWeek: Number,

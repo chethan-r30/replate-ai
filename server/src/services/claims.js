@@ -2,6 +2,7 @@
 import mongoose from 'mongoose';
 import { randomInt, timingSafeEqual } from 'node:crypto';
 import { FoodListing } from '../models/FoodListing.js';
+import { SurplusHistory } from '../models/SurplusHistory.js';
 import { Claim } from '../models/Claim.js';
 import { Organization } from '../models/Organization.js';
 import { AppError } from '../middleware/errors.js';
@@ -119,12 +120,16 @@ async function transitionClaim(claimId, user, action, code) {
     { new: true },
   );
   if (!changed) throw new AppError(409, 'Claim changed; retry');
-  if (action === 'picked_up')
+  if (action === 'picked_up') {
+    await SurplusHistory.updateOne(
+      { listing: listing._id },
+      { $set: { quantityClaimed: listing.servings } },
+    );
     await FoodListing.updateOne(
       { _id: listing._id, activeClaim: claim._id, status: 'reserved' },
       { $set: { status: 'picked_up' } },
     );
-  else if (['rejected', 'cancelled', 'no_show'].includes(action))
+  } else if (['rejected', 'cancelled', 'no_show'].includes(action))
     await FoodListing.updateOne(
       { _id: listing._id, activeClaim: claim._id, status: 'reserved' },
       {

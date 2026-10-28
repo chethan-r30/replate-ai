@@ -252,4 +252,143 @@ describe('authentication and RBAC', () => {
       ).status,
     ).toBe(403);
   });
+  it('covers auth validation, logout, missing refresh and query/role injection', async () => {
+    for (const path of [
+      'register',
+      'login',
+      'verify-email',
+      'forgot-password',
+      'reset-password',
+    ])
+      expect(
+        (
+          await request(app)
+            .post('/api/v1/auth/' + path)
+            .send({ extra: true })
+        ).status,
+        path,
+      ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/auth/register')
+          .send({ ...signup('inject@example.com'), role: 'admin' })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/auth/login')
+          .send({ email: { $ne: null }, password: 'bad' })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await request(app).post('/api/v1/auth/refresh').send({})).status,
+    ).toBe(401);
+    expect(
+      (await request(app).post('/api/v1/auth/refresh').send({ extra: 1 }))
+        .status,
+    ).toBe(400);
+    expect(
+      (await request(app).post('/api/v1/auth/logout').send({ extra: 1 }))
+        .status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/auth/logout')
+          .set('Origin', 'https://evil.example')
+          .send({})
+      ).status,
+    ).toBe(403);
+    const email = 'logout' + ip + '@example.com';
+    await register(email);
+    const logged = await login(email);
+    const cookie = logged.headers['set-cookie'][0].split(';')[0];
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/auth/me?extra=1')
+          .set('Authorization', 'Bearer ' + logged.body.data.accessToken)
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/auth/logout')
+          .set('Cookie', cookie)
+          .send({})
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/auth/refresh')
+          .set('Cookie', cookie)
+          .send({})
+      ).status,
+    ).toBe(401);
+  });
+  it('validates org mutations and requires fresh approval after edits', async () => {
+    const email = 'edit' + ip + '@example.com';
+    await register(email);
+    const l = await login(email);
+    const auth = 'Bearer ' + l.body.data.accessToken;
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/organizations')
+          .set('Authorization', auth)
+          .send({})
+      ).status,
+    ).toBe(400);
+    const org = (
+      await request(app)
+        .post('/api/v1/organizations')
+        .set('Authorization', auth)
+        .send(proof)
+    ).body.data;
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/organizations/' + org._id)
+          .set('Authorization', auth)
+          .send({})
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/organizations/' + org._id)
+          .set('Authorization', auth)
+          .send({ timezone: 'Invalid/Zone' })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/organizations/' + org._id)
+          .set('Authorization', auth)
+          .send({ name: 'Updated kitchen' })
+      ).status,
+    ).toBe(200);
+    expect((await User.findOne({ email })).verificationStatus).toBe('pending');
+    await User.updateOne({ email }, { $set: { role: 'admin' } });
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/organizations/' + org._id + '/verify')
+          .set('Authorization', auth)
+          .send({ status: 'approved', reason: 'x' })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch('/api/v1/organizations/' + org._id)
+          .set('Authorization', auth)
+          .send({ name: 'Denied' })
+      ).status,
+    ).toBe(403);
+  });
 });
