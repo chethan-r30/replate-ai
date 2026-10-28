@@ -10,31 +10,33 @@ const readUser = batchRead(
   (ids) => User.find({ _id: { $in: ids }, deletedAt: null }).lean(),
   (user) => user._id,
 );
-// One fresh batched aggregation reads identity and NGO approval together. No
-// completed result is retained, and the owner lookup uses its unique index.
+// One shared collection window groups fresh identity and NGO approval reads.
 const readClaimIdentity = batchRead(
-  (ids) =>
-    User.aggregate([
-      {
-        $match: {
-          _id: { $in: ids.map((id) => new User.base.Types.ObjectId(id)) },
-          deletedAt: null,
-        },
-      },
-      { $project: { role: 1, isEmailVerified: 1, verificationStatus: 1 } },
-      {
-        $lookup: {
-          from: Organization.collection.name,
-          localField: '_id',
-          foreignField: 'owner',
-          pipeline: [
-            { $match: { type: 'ngo', verificationStatus: 'approved' } },
-            { $project: { _id: 1 } },
-          ],
-          as: 'approvedNgos',
-        },
-      },
-    ]).option({ batchSize: 1000 }),
+  async (ids) => {
+    // One collection window, two parallel indexed reads. Both are fresh and
+    // completed permission snapshots are never retained between requests.
+    const [users, ngos] = await Promise.all([
+      User.find({ _id: { $in: ids }, deletedAt: null })
+        .select('role isEmailVerified verificationStatus')
+        .batchSize(200)
+        .lean(),
+      Organization.find({
+        owner: { $in: ids },
+        type: 'ngo',
+        verificationStatus: 'approved',
+      })
+        .select('owner')
+        .batchSize(200)
+        .lean(),
+    ]);
+    const byOwner = new Map(ngos.map((ngo) => [String(ngo.owner), ngo]));
+    return users.map((user) => ({
+      ...user,
+      approvedNgos: byOwner.has(String(user._id))
+        ? [byOwner.get(String(user._id))]
+        : [],
+    }));
+  },
   (user) => user._id,
 );
 export const requireAuth = (config) =>
