@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { fork } from 'node:child_process';
 // Disposable local load test. Never points at or modifies a production database.
 import autocannon from 'autocannon';
@@ -142,6 +143,12 @@ try {
   }
   const output = {
     measuredAt: new Date().toISOString(),
+    topology: {
+      cpuCores: os.cpus().length,
+      memoryBytes: os.totalmem(),
+      platform: os.platform(),
+      release: os.release(),
+    },
     environment:
       'Disposable single-node Mongo replica set; API and load generator in separate processes; Node ' +
       process.version,

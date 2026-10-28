@@ -45,7 +45,9 @@ try {
     args: ['--no-sandbox', '--remote-debugging-port=9222'],
   });
   await mkdir('test-results', { recursive: true });
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+  });
   const page = await context.newPage({ viewport: { width: 390, height: 844 } });
   for (const path of ['/', '/listings', '/login', '/impact']) {
     await page.goto('http://localhost:4173' + path);
