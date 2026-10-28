@@ -42,3 +42,5 @@ Automated axe WCAG2A/AA and2.1AA checks on mobile home/listings/login/impact fou
 A single-query user/organization join was tested to shorten one permission lookup without caching. It did not improve claim p95 (1185ms) and was reverted. Profiling can be rerun with PROFILE_DB=1 npm run test:load. No repeated trial is warranted without a new hypothesis.
 
 A100ms notification burst-coalescing experiment reduced local claim p95 only to1011ms, still above target. The in-memory queue was not retained: crash-safe notification delivery would need a durable outbox, and a small latency gain does not justify introducing a loss window. Existing immediate persistence behavior is preserved.
+
+A second CI artifact (run40723132113, commit da089ca) records runner topology:4 CPU cores,16.76GB RAM, Linux7.0 Azure, Node20.20.2, same single-node replica set and separate API/load processes. Search176.37ms p95, claim1508.38ms p95, zero failures,200 persisted claims. This also misses the target and contradicts a claim that more host cores/memory alone guarantee a fix. No infrastructure purchase is recommended from this evidence.
