@@ -163,6 +163,10 @@ async function drainClaims() {
   while (waiting.length) {
     const batch = waiting.splice(0, 200);
     await persistClaimBatch(batch);
+    // Keep collecting arrivals briefly between commits. Without this window,
+    // tail arrivals can form a long chain of tiny serial transactions.
+    if (waiting.length && waiting.length < 200)
+      await new Promise((resolve) => setTimeout(resolve, 10));
   }
   scheduled = false;
 }
@@ -224,14 +228,27 @@ async function persistClaimBatch(batch) {
           new Set(created ? [String(claim._id)] : []),
         );
       }
-      const listings = await FoodListing.find({
-        _id: { $in: batch.map((x) => x.listingId) },
-      })
-        .select(
-          'restaurant status bestBefore pickupWindow.end reservedBy activeClaim',
+      const listings = await FoodListing.collection
+        .find(
+          {
+            _id: {
+              $in: batch.map((x) => new mongoose.Types.ObjectId(x.listingId)),
+            },
+          },
+          {
+            session,
+            projection: {
+              restaurant: 1,
+              status: 1,
+              bestBefore: 1,
+              'pickupWindow.end': 1,
+              reservedBy: 1,
+              activeClaim: 1,
+            },
+            batchSize: 200,
+          },
         )
-        .batchSize(200)
-        .lean();
+        .toArray();
       const available = new Map(listings.map((x) => [String(x._id), x]));
       const pending = new Map(),
         results = [],

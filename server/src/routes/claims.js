@@ -17,6 +17,8 @@ import {
   pagination,
 } from '../middleware/auth.js';
 import { AppError, asyncRoute, ok } from '../middleware/errors.js';
+// Compile stable validators once, rather than allocating Zod graphs per claim.
+const claimBody = z.object({ listingId: objectId }).strict();
 export function claimRoutes(config) {
   const r = Router();
   r.use(requireAuth(config));
@@ -46,10 +48,7 @@ export function claimRoutes(config) {
     requireRole('ngo'),
     requireVerified,
     asyncRoute(async (req, res) => {
-      const { listingId } = z
-        .object({ listingId: objectId })
-        .strict()
-        .parse(req.body);
+      const { listingId } = claimBody.parse(req.body);
       const ngoStart = performance.now();
       const ngo = req.approvedClaimNgo;
       profile('ngo-read', performance.now() - ngoStart);
