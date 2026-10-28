@@ -4,6 +4,7 @@ const config = z.object({ VITE_API_URL: z.string().url() }).parse({
   VITE_API_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
 });
 let accessToken = null;
+let refreshing;
 export const getAccessToken = () => accessToken;
 export const setAccessToken = (token) => {
   accessToken = token;
@@ -20,11 +21,15 @@ export async function api(path, { method = 'GET', body, retry = true } = {}) {
   });
   if (response.status === 401 && retry && !path.startsWith('/auth/')) {
     try {
-      const data = await api('/auth/refresh', {
-        method: 'POST',
-        body: {},
-        retry: false,
-      });
+      if (!refreshing)
+        refreshing = api('/auth/refresh', {
+          method: 'POST',
+          body: {},
+          retry: false,
+        }).finally(() => {
+          refreshing = null;
+        });
+      const data = await refreshing;
       setAccessToken(data.accessToken);
       return api(path, { method, body, retry: false });
     } catch {

@@ -167,34 +167,56 @@ export default function Dashboard() {
           <Status query={listings}>
             {listings.data?.items.length ? (
               <div className="mb-10 grid gap-4 md:grid-cols-3">
-                {listings.data.items.map((l) => (
-                  <div key={l._id}>
-                    <ListingCard listing={l} />
-                    <Recommendations listingId={l._id} />
-                    {l.status === 'available' && (
-                      <div className="mt-2 flex gap-4 text-sm">
-                        <Link
-                          className="underline"
-                          to={`/listings/${l._id}/edit`}
-                        >
-                          Edit
-                        </Link>
-                        <button
-                          className="underline"
-                          onClick={() =>
-                            act(`/listings/${l._id}`, {}, 'DELETE')
-                          }
-                        >
-                          Cancel listing
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {listings.data.items
+                  .filter((l) => ['available', 'reserved'].includes(l.status))
+                  .map((l) => (
+                    <div key={l._id}>
+                      <ListingCard listing={l} />
+                      {l.status === 'available' && (
+                        <Recommendations listingId={l._id} />
+                      )}
+                      {l.status === 'available' && (
+                        <div className="mt-2 flex gap-4 text-sm">
+                          <Link
+                            className="underline"
+                            to={`/listings/${l._id}/edit`}
+                          >
+                            Edit
+                          </Link>
+                          <button
+                            className="underline"
+                            onClick={() =>
+                              act(`/listings/${l._id}`, {}, 'DELETE')
+                            }
+                          >
+                            Cancel listing
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
               </div>
             ) : (
               <Empty>
                 No listings yet. Post surplus when safe food is ready to share.
+              </Empty>
+            )}
+          </Status>
+          <h2 className="mb-4 mt-10 text-2xl font-semibold">Listing history</h2>
+          <Status query={listings}>
+            {listings.data?.items.some(
+              (l) => !['available', 'reserved'].includes(l.status),
+            ) ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                {listings.data.items
+                  .filter((l) => !['available', 'reserved'].includes(l.status))
+                  .map((l) => (
+                    <ListingCard key={l._id} listing={l} />
+                  ))}
+              </div>
+            ) : (
+              <Empty>
+                No completed, cancelled or expired listings on this page.
               </Empty>
             )}
           </Status>
@@ -443,7 +465,7 @@ export default function Dashboard() {
                 </span>
                 <button
                   className="underline"
-                  disabled={u._id === user.id}
+                  disabled={u.role === 'admin'}
                   onClick={() =>
                     act(
                       `/admin/users/${u._id}`,

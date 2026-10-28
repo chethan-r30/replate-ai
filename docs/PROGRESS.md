@@ -52,3 +52,5 @@ Visual testing fixed two actual defects: StrictMode duplicate refresh revoked a 
 - Phase 10: complete README/architecture/API/deployment/test/performance docs and fresh-clone verification. Main currently has bootstrap only; releases go via protected PR, never bypass.
 
 No live URL, production readiness, coverage target, load/security/performance target or complete end-to-end definition of done is claimed.
+
+Phase 5 follow-up: Socket auth/user-room isolation test passes; production offline shell loaded after network was disabled. Explicit local role-flow smoke still passes. Active/reserved listings are now separated from completed/cancelled/expired history, with no matching controls on history. Self-disable is blocked and all admin targets are disabled from this management endpoint/UI to prevent last-admin lockout. Latest local count: 43 tests. No full coverage or installability certification yet.

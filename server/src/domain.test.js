@@ -409,4 +409,33 @@ describe('core domain', () => {
       ).status,
     ).toBe(403);
   });
+  it('cannot disable any admin, including self or the last other admin', async () => {
+    await User.updateOne(
+      { _id: restaurant.user._id },
+      { $set: { role: 'admin' } },
+    );
+    const other = await User.create({
+      name: 'Other Admin',
+      email: 'other-admin@example.com',
+      role: 'admin',
+      passwordHash: 'unused',
+    });
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/admin/users/${restaurant.user._id}`)
+          .set('Authorization', restaurant.auth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .patch(`/api/v1/admin/users/${other._id}`)
+          .set('Authorization', restaurant.auth)
+          .send({ disabled: true })
+      ).status,
+    ).toBe(403);
+    expect((await User.findById(other._id)).deletedAt).toBeUndefined();
+  });
 });

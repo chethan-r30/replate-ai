@@ -190,6 +190,12 @@ export function adminRoutes(config) {
       const data = z.object({ disabled: z.boolean() }).strict().parse(req.body);
       if (id === String(req.user._id))
         throw new AppError(400, 'Cannot disable your own account');
+      const target = await User.findById(id).select('role');
+      if (target?.role === 'admin')
+        throw new AppError(
+          403,
+          'Admin accounts cannot be disabled through this endpoint',
+        );
       const user = await User.findByIdAndUpdate(
         id,
         { $set: { deletedAt: data.disabled ? new Date() : null } },
