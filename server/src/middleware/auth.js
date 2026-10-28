@@ -10,14 +10,32 @@ const readUser = batchRead(
   (ids) => User.find({ _id: { $in: ids }, deletedAt: null }).lean(),
   (user) => user._id,
 );
-const readClaimNgo = batchRead(
+// One fresh batched aggregation reads identity and NGO approval together. No
+// completed result is retained, and the owner lookup uses its unique index.
+const readClaimIdentity = batchRead(
   (ids) =>
-    Organization.find({
-      owner: { $in: ids },
-      type: 'ngo',
-      verificationStatus: 'approved',
-    }).lean(),
-  (org) => org.owner,
+    User.aggregate([
+      {
+        $match: {
+          _id: { $in: ids.map((id) => new User.base.Types.ObjectId(id)) },
+          deletedAt: null,
+        },
+      },
+      { $project: { role: 1, isEmailVerified: 1, verificationStatus: 1 } },
+      {
+        $lookup: {
+          from: Organization.collection.name,
+          localField: '_id',
+          foreignField: 'owner',
+          pipeline: [
+            { $match: { type: 'ngo', verificationStatus: 'approved' } },
+            { $project: { _id: 1 } },
+          ],
+          as: 'approvedNgos',
+        },
+      },
+    ]).option({ batchSize: 1000 }),
+  (user) => user._id,
 );
 export const requireAuth = (config) =>
   asyncRoute(async (req, _res, next) => {
@@ -30,11 +48,10 @@ export const requireAuth = (config) =>
     const claimCreate =
       req.method === 'POST' &&
       req.originalUrl.split('?')[0].replace(/\/$/, '') === '/api/v1/claims';
-    const [user, ngo] = await Promise.all([
-      readUser(token.sub),
-      claimCreate ? readClaimNgo(token.sub) : Promise.resolve(null),
-    ]);
-    if (claimCreate) req.approvedClaimNgo = ngo;
+    const user = await (claimCreate
+      ? readClaimIdentity(token.sub)
+      : readUser(token.sub));
+    if (claimCreate) req.approvedClaimNgo = user?.approvedNgos?.[0] || null;
     if (!user) throw new AppError(401, 'Sign in required');
     profile('auth', performance.now() - authStart);
     req.user = user;

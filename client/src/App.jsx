@@ -208,6 +208,20 @@ export default function App() {
             </div>
           </nav>
         </header>
+        {import.meta.env.VITE_DEMO_MODE === 'true' && (
+          <aside
+            aria-label="Demo limitations"
+            className="border-b border-stone-300 bg-amber-50 px-5 py-3 text-sm text-stone-800 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200"
+          >
+            <div className="mx-auto max-w-6xl">
+              Demo only. All seeded food and impact data is synthetic, not
+              available for pickup. The free API may take about a minute to
+              wake. Reminders pause while it sleeps; signup email and photo
+              uploads need configured services. Use demo accounts, not real
+              personal data.
+            </div>
+          </aside>
+        )}
         <main id="main" className="mx-auto max-w-6xl px-5">
           <Suspense
             fallback={

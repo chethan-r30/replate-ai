@@ -156,23 +156,27 @@ mongoose.set('transactionAsyncLocalStorage', true);
 // until its transaction commits. A process crash loses only unanswered requests.
 let waiting = [];
 let scheduled = false;
+let outstanding = 0;
+async function drainClaims() {
+  // Collect arrivals during the prior commit into one bounded next transaction.
+  // Do not freeze multiple tiny batches while the database is already busy.
+  while (waiting.length) {
+    const batch = waiting.splice(0, 200);
+    await persistClaimBatch(batch);
+  }
+  scheduled = false;
+}
 export function createClaim(listingId, ngo) {
   return new Promise((resolve, reject) => {
-    if (waiting.length >= 1000) {
+    if (outstanding >= 1000) {
       reject(new AppError(503, 'Claim queue is busy; retry shortly'));
       return;
     }
+    outstanding += 1;
     waiting.push({ listingId: String(listingId), ngo, resolve, reject });
     if (!scheduled) {
       scheduled = true;
-      setTimeout(() => {
-        scheduled = false;
-        const batch = waiting;
-        waiting = [];
-        // Bound each transaction; overlapping chunks still use compare-and-swap.
-        for (let offset = 0; offset < batch.length; offset += 200)
-          persistClaimBatch(batch.slice(offset, offset + 200));
-      }, 25);
+      setTimeout(drainClaims, 25);
     }
   });
 }
@@ -222,7 +226,12 @@ async function persistClaimBatch(batch) {
       }
       const listings = await FoodListing.find({
         _id: { $in: batch.map((x) => x.listingId) },
-      }).lean();
+      })
+        .select(
+          'restaurant status bestBefore pickupWindow.end reservedBy activeClaim',
+        )
+        .batchSize(200)
+        .lean();
       const available = new Map(listings.map((x) => [String(x._id), x]));
       const pending = new Map(),
         results = [],
@@ -328,6 +337,8 @@ async function persistClaimBatch(batch) {
     );
   } catch (error) {
     batch.forEach((item) => item.reject(error));
+  } finally {
+    outstanding -= batch.length;
   }
 }
 export async function changeClaim(claimId, user, action, code) {

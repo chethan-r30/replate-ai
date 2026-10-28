@@ -1,0 +1,16 @@
+name: Optional live uptime check
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  health:
+    if: ${{ vars.REPLATE_API_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check configured API readiness
+        env:
+          API_URL: ${{ vars.REPLATE_API_URL }}
+        run: curl --fail --max-time 60 --retry 2 "$API_URL/api/v1/ready"

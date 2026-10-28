@@ -23,7 +23,8 @@
     "test:e2e": "node scripts/verification/role-flow.mjs && MOBILE=1 node scripts/verification/role-flow.mjs",
     "test:load": "node scripts/verification/load.mjs",
     "test:lighthouse": "node scripts/verification/performance.mjs",
-    "analyze": "ANALYZE=1 npm run build -w client"
+    "analyze": "ANALYZE=1 npm run build -w client",
+    "seed": "node scripts/seed.js"
   },
   "lint-staged": {
     "*.{js,jsx}": [

@@ -1129,4 +1129,35 @@ describe('core domain', () => {
       ).status,
     ).toBe(403);
   });
+  it('fresh batched claim identity rejects changed role, email and deleted users', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const claimAs = (auth) =>
+      callRoute('post', '/claims')
+        .set('Authorization', auth)
+        .send({ listingId: String(listing._id) });
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { role: 'volunteer' } },
+    );
+    expect((await claimAs(ngo.auth)).status).toBe(403);
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { role: 'ngo', isEmailVerified: false } },
+    );
+    expect((await claimAs(ngo.auth)).status).toBe(403);
+    await User.updateOne(
+      { _id: ngo.user._id },
+      { $set: { isEmailVerified: true, deletedAt: new Date() } },
+    );
+    expect((await claimAs(ngo.auth)).status).toBe(401);
+    const outcomes = await Promise.all([claimAs(ngo.auth), claimAs(ngo2.auth)]);
+    expect(outcomes.map((x) => x.status)).toEqual([401, 201]);
+    expect(await Claim.countDocuments()).toBe(1);
+    expect((await Claim.findOne()).ngo.toString()).toBe(
+      ngo2.org._id.toString(),
+    );
+  });
 });
