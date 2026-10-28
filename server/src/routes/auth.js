@@ -1,7 +1,7 @@
 // Full email/password lifecycle with rotating refresh families and single-use links.
 import { Router } from 'express';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import rateLimit from 'express-rate-limit';
 import { User, publicUser } from '../models/User.js';
 import { RefreshToken } from '../models/RefreshToken.js';
