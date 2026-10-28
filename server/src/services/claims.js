@@ -156,19 +156,25 @@ mongoose.set('transactionAsyncLocalStorage', true);
 // until its transaction commits. A process crash loses only unanswered requests.
 let waiting = [];
 let scheduled = false;
+let activeBatches = 0;
 let outstanding = 0;
-async function drainClaims() {
-  // Collect arrivals during the prior commit into one bounded next transaction.
-  // Do not freeze multiple tiny batches while the database is already busy.
-  while (waiting.length) {
-    const batch = waiting.splice(0, 200);
-    await persistClaimBatch(batch);
-    // Keep collecting arrivals briefly between commits. Without this window,
-    // tail arrivals can form a long chain of tiny serial transactions.
-    if (waiting.length && waiting.length < 200)
-      await new Promise((resolve) => setTimeout(resolve, 10));
-  }
+function scheduleClaims() {
+  if (scheduled || !waiting.length || activeBatches >= 2) return;
+  scheduled = true;
+  setTimeout(drainClaims, 10);
+}
+function drainClaims() {
   scheduled = false;
+  if (!waiting.length || activeBatches >= 2) return;
+  const batch = waiting.splice(0, 200);
+  activeBatches++;
+  // At most two independent transactions overlap. Conditional writes and Mongo's
+  // transaction conflict retry still decide races; no response precedes commit.
+  persistClaimBatch(batch).finally(() => {
+    activeBatches--;
+    scheduleClaims();
+  });
+  scheduleClaims();
 }
 export function createClaim(listingId, ngo) {
   return new Promise((resolve, reject) => {
@@ -178,10 +184,7 @@ export function createClaim(listingId, ngo) {
     }
     outstanding += 1;
     waiting.push({ listingId: String(listingId), ngo, resolve, reject });
-    if (!scheduled) {
-      scheduled = true;
-      setTimeout(drainClaims, 10);
-    }
+    scheduleClaims();
   });
 }
 async function persistClaimBatch(batch) {
