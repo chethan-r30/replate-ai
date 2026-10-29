@@ -10,7 +10,7 @@ Share surplus food between restaurants and NGOs, with reviewed AI assistance, ma
 
 Phases0-9 are implemented and verified. Phase10 documents the final checks below. The live restaurant-post -> NGO-request -> restaurant-approval -> code-confirmed-pickup flow passed2026-10-29. All food, organizations, addresses and impact are synthetic. Nothing is available for actual collection.
 
-This is the accepted **free demo, not a production-ready public food service**. The API can take about a minute to wake; reminders pause while it sleeps. Anthropic, Cloudinary and SMTP keys are absent. Manual entry, numeric forecasts and rule-based matching work; real signup verification/reset email and image upload need configured services. Do not enter personal data or use personal passwords.
+This is the accepted **free demo, not a production-ready public food service**. The API can take about a minute to wake; reminders pause while it sleeps. Groq Free is connected for reviewed text/image drafts and forecast prose; quota/provider failures retain manual/numeric fallback. Cloudinary storage and signup/reset email are still awaiting configured live verification. Manual entry and rule-based matching work. Brevo HTTPS mail support is opt-in; its no-domain sender is a temporary demo option, not permanent production mail. Do not enter personal data or use personal passwords.
 
 Demo identities: restaurant1@demo.replate.invalid through restaurant3; ngo1@demo.replate.invalid through ngo3. The owner has the shared demo-only password in the private vault item `ReplateAI synthetic demo accounts`. Do not publish it or the admin credential. Seeded pickup windows expire naturally; past demo food is not kept artificially available. New synthetic listings can be posted to repeat the workflow.
 
@@ -32,7 +32,7 @@ flowchart LR
   API --> DB[(Atlas MongoDB replica set)]
   API -. optional .-> Claude[Anthropic]
   API -. optional .-> Images[Cloudinary]
-  API -. optional .-> Email[SMTP]
+  API -. optional .-> Email[SMTP or Brevo HTTPS]
 ```
 
 JavaScript ES2022/JSX throughout. React18, Vite, Tailwind, React Router6, TanStack Query, Zustand, React Hook Form/Zod, Leaflet/OSM, Recharts, Socket.IO and PWA shell. Node20, Express, Mongoose, Zod, pino, Helmet, cron and Vitest/Supertest/Playwright.
@@ -67,6 +67,7 @@ Never commit real values. Full key list: [server/.env.example](server/.env.examp
 | COOKIE_DOMAIN                                                    | Legacy placeholder; refresh cookie stays host-only            |
 | ANTHROPIC_API_KEY, ANTHROPIC_MODEL                               | Optional reviewed parser/prose;10s timeout and fallback       |
 | CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET | Optional image upload; unavailable without keys               |
+| EMAIL_PROVIDER, BREVO_API_KEY, BREVO_SENDER_EMAIL                | Optional Brevo HTTPS transactional mail, default smtp         |
 | SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM           | Verification/reset/notification email; no false delivery      |
 | RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX, AI_RATE_LIMIT_PER_HOUR     | Global and AI limits; login also separately limited           |
 | REDIS_URL                                                        | Optional shared cache                                         |
