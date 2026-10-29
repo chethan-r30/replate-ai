@@ -1,3 +1,4 @@
+import ProofLink from '../components/ProofLink.jsx';
 import Recommendations from '../components/Recommendations.jsx';
 // Role dashboards expose real server state and explicit approval/empty states.
 import { useEffect, useState } from 'react';
@@ -475,15 +476,7 @@ export default function Dashboard() {
                       {o.registrationNo} · {o.address} · {o.timezone}
                     </p>
                     {o.verificationDocs.map((url) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mr-4 underline"
-                      >
-                        Open proof
-                      </a>
+                      <ProofLink key={url} url={url} />
                     ))}
                     <div className="mt-4 flex gap-3">
                       <button

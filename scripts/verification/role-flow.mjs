@@ -12,6 +12,7 @@ const root = new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 const { createApp } = await import(root + '/server/src/app.js');
 const { parseEnv } = await import(root + '/server/src/config/env.js');
 const { User } = await import(root + '/server/src/models/User.js');
+const { default: sharp } = await import('sharp');
 
 const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 await mongoose.connect(mongo.getUri());
@@ -24,6 +25,11 @@ const config = parseEnv({
   RATE_LIMIT_MAX: 10000,
 });
 await mkdir(root + '/test-results', { recursive: true });
+await sharp({
+  create: { width: 640, height: 280, channels: 3, background: '#e5efe8' },
+})
+  .png()
+  .toFile(root + '/test-results/upload-synthetic.png');
 let server, browser, web;
 try {
   const passwordHash = await bcrypt.hash('DemoVisual123!', 12);
@@ -90,15 +96,13 @@ try {
       )
     );
   });
-  await page
-    .locator('.leaflet-container')
-    .screenshot({
-      path:
-        root +
-        '/test-results/location-map-' +
-        (process.env.MOBILE ? 'mobile' : 'desktop') +
-        '.png',
-    });
+  await page.locator('.leaflet-container').screenshot({
+    path:
+      root +
+      '/test-results/location-map-' +
+      (process.env.MOBILE ? 'mobile' : 'desktop') +
+      '.png',
+  });
   await page.screenshot({
     path:
       root +
@@ -144,7 +148,7 @@ try {
       Address: '123 Demo Street',
       'IANA timezone': 'Asia/Kolkata',
       'Daily meals capacity': '100',
-      'Proof document URL': 'https://example.com/proof',
+      'Or an externally hosted proof URL': 'https://example.com/proof',
       'Opening hour (0-24)': '0',
       'Closing hour (0-24)': '24',
     };
@@ -156,6 +160,18 @@ try {
     await page
       .getByText('Current location selected.', { exact: false })
       .waitFor();
+    await page
+      .getByRole('button', { name: 'Hide location map', exact: true })
+      .click();
+    if (role === 'restaurant')
+      await page.screenshot({
+        path:
+          root +
+          '/test-results/proof-form-' +
+          (process.env.MOBILE ? 'mobile' : 'desktop') +
+          '.png',
+        fullPage: true,
+      });
     await page
       .getByRole('button', { name: 'Submit for review', exact: true })
       .click();
@@ -170,6 +186,63 @@ try {
         exact: true,
       }),
     });
+    if (role === 'restaurant') {
+      // Real local API upload, byte decoding and database storage, no provider mocks.
+      await login('restaurant@demo.example');
+      await page
+        .getByRole('link', { name: 'Organization & preferences', exact: true })
+        .click();
+      await page
+        .getByLabel('Upload verification proof image')
+        .setInputFiles(root + '/test-results/upload-synthetic.png');
+      await page
+        .getByRole('button', { name: 'View private proof', exact: true })
+        .waitFor();
+      const { Organization } = await import(
+        root + '/server/src/models/Organization.js'
+      );
+      const { ProofUpload } = await import(
+        root + '/server/src/models/ProofUpload.js'
+      );
+      const restaurantUser = await User.findOne({
+        email: 'restaurant@demo.example',
+      });
+      const proof = await ProofUpload.findOne({
+        owner: restaurantUser._id,
+        kind: 'proof',
+      });
+      assert(proof, 'Real proof upload must persist in database');
+      await Organization.updateOne(
+        { owner: restaurantUser._id },
+        { $set: { verificationDocs: [`/uploads/proof/${proof._id}`] } },
+      );
+      await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+      await login('admin@demo.example');
+      await page.reload();
+      await card
+        .getByRole('button', { name: 'View private proof', exact: true })
+        .click();
+      await page
+        .getByAltText('Uploaded organization verification proof')
+        .waitFor();
+      await page.waitForFunction(() => {
+        const i = document.querySelector(
+          'img[alt="Uploaded organization verification proof"]',
+        );
+        return i?.complete && i.naturalWidth > 0;
+      });
+      await page.screenshot({
+        path:
+          root +
+          '/test-results/proof-preview-' +
+          (process.env.MOBILE ? 'mobile' : 'desktop') +
+          '.png',
+        fullPage: true,
+      });
+      await card
+        .getByRole('button', { name: 'Close proof', exact: true })
+        .click();
+    }
     await card.getByRole('button', { name: 'Approve', exact: true }).click();
     await page
       .getByRole('heading', {
@@ -182,6 +255,24 @@ try {
   }
   await login('restaurant@demo.example');
   await page.getByRole('link', { name: 'Post surplus', exact: true }).click();
+  await page
+    .getByLabel('Upload listing photo (public)')
+    .setInputFiles(root + '/test-results/upload-synthetic.png');
+  await page.getByAltText('Uploaded listing photo preview').waitFor();
+  await page.waitForFunction(() => {
+    const i = document.querySelector(
+      'img[alt="Uploaded listing photo preview"]',
+    );
+    return i?.complete && i.naturalWidth > 0;
+  });
+  await page.screenshot({
+    path:
+      root +
+      '/test-results/public-photo-' +
+      (process.env.MOBILE ? 'mobile' : 'desktop') +
+      '.png',
+    fullPage: true,
+  });
   await page.getByLabel('Title', { exact: true }).fill('Smoke test bread');
   await page
     .getByLabel('Description', { exact: true })

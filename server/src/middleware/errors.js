@@ -14,6 +14,10 @@ export function notFound(_req, _res, next) {
 export function errorHandler(error, _req, res, _next) {
   let status = error instanceof ZodError ? 400 : error.status || 500;
   let message = error instanceof ZodError ? 'Validation failed' : error.message;
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    status = 413;
+    message = 'Choose a file under 5MB';
+  }
   if (error.code === 11000) {
     status = 409;
     message = 'This record already exists';
