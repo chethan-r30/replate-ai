@@ -1,7 +1,6 @@
 // Claude is an optional draft assistant, never a food-safety authority.
-import Anthropic from '@anthropic-ai/sdk';
+import { aiConfigured, createAiClient } from './provider.js';
 import { z } from 'zod';
-import { hasKey } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 export const disclaimer =
   'AI suggestions can be wrong. A responsible person must review food details, allergens, safety and the pickup deadline before posting. Do not donate food you cannot confirm is safe.';
@@ -41,17 +40,11 @@ export async function parseListing(
   { client, timeoutMs = 10000 } = {},
 ) {
   const data = parseInput.parse(input);
-  if (!hasKey(config.ANTHROPIC_API_KEY) && !client) {
+  if (!aiConfigured(config) && !client) {
     logger.info('AI key missing; manual entry selected');
     return fallback('AI is not configured. Enter the listing manually.');
   }
-  const sdk =
-    client ||
-    new Anthropic({
-      apiKey: config.ANTHROPIC_API_KEY,
-      maxRetries: 0,
-      timeout: 10000,
-    });
+  const sdk = client || createAiClient(config);
   const controller = new AbortController();
   let timer;
   const timeout = new Promise((_, reject) => {
@@ -121,15 +114,9 @@ export async function parseListing(
   }
 }
 export async function forecastInsight(numbers, config, { client } = {}) {
-  if (!hasKey(config.ANTHROPIC_API_KEY) && !client) return null;
+  if (!aiConfigured(config) && !client) return null;
   try {
-    const sdk =
-      client ||
-      new Anthropic({
-        apiKey: config.ANTHROPIC_API_KEY,
-        timeout: 10000,
-        maxRetries: 0,
-      });
+    const sdk = client || createAiClient(config);
     const r = await sdk.messages.create({
       model: config.ANTHROPIC_MODEL,
       max_tokens: 250,
