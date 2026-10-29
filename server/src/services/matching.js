@@ -4,6 +4,7 @@ import { sendPlainEmail } from '../lib/mail.js';
 import { notificationConfig } from './notifications.js';
 import { emitNotification } from './realtime.js';
 import { Organization } from '../models/Organization.js';
+import { Feedback } from '../models/Feedback.js';
 import { Claim } from '../models/Claim.js';
 import { FoodListing } from '../models/FoodListing.js';
 import { Notification } from '../models/Notification.js';
@@ -25,6 +26,37 @@ export async function recommendations(
     { $limit: 200 },
   ]);
   if (!candidates.length) return [];
+  // Derive reliability from real terminal claims and participant feedback.
+  const ids = candidates.map((x) => x._id);
+  const [outcomes, ratings] = await Promise.all([
+    Claim.aggregate([
+      {
+        $match: {
+          ngo: { $in: ids },
+          status: { $in: ['picked_up', 'no_show'] },
+        },
+      },
+      {
+        $group: {
+          _id: '$ngo',
+          total: { $sum: 1 },
+          missed: { $sum: { $cond: [{ $eq: ['$status', 'no_show'] }, 1, 0] } },
+        },
+      },
+    ]),
+    Feedback.aggregate([
+      { $match: { to: { $in: ids } } },
+      { $group: { _id: '$to', average: { $avg: '$rating' } } },
+    ]),
+  ]);
+  for (const candidate of candidates) {
+    const outcome = outcomes.find(
+      (x) => String(x._id) === String(candidate._id),
+    );
+    const rating = ratings.find((x) => String(x._id) === String(candidate._id));
+    candidate.noShowRate = outcome ? outcome.missed / outcome.total : 0;
+    candidate.rating = rating?.average || 0;
+  }
   const now = new Date();
   // Per-NGO local calendar days can start up to 26 hours apart.
   const day = new Date(now.getTime() - 48 * 3600000);

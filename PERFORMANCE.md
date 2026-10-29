@@ -1,6 +1,6 @@
-# Performance evidence and open gate
+# Performance evidence
 
-Measured 2026-10-28. Latest corrected-head three-trial CI40730689271 meets the performance target: claim p95=203.82/193.92/225.61ms and search86.73/92.32/89.28ms,0errors,200distinct NGO claims/reservations each. Earlier postmerge failures below are retained. Full exact-head security CI must finish before Phase8 merge.
+Final deployed main870afad CI40760838986 passed three independent200-user trials: claim253.47/254.19/234.38ms, search96.46/94.59/111.43ms, zeroerrors and200distinct persisted claims/reservations each. Two bounded concurrent transaction batches and cached public wire serialization preserve commit-before-success and live permissions. Earlier failed experiments remain below. This measures disposable CI topology, not shared Free Render production capacity.
 
 ## Frontend
 

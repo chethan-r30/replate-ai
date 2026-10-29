@@ -3,7 +3,7 @@
 Phase8 checks use disposable Mongo replica sets and Node20. No external penetration test or compliance certification is claimed.
 
 - API requires HTTPS in production (one trusted reverse-proxy hop); direct HTTP is rejected. Deploy only behind the intended proxy, with the origin inaccessible to untrusted forwarded-header injection.
-- Helmet sets restrictive API CSP/HSTS, no frames and no MIME sniffing. CORS and Origin checks accept only CLIENT_URL. Refresh cookies are host-only/httpOnly, Secure in production, SameSite Strict, limited to the auth path. A same-site deployment route is still required before separate Vercel/Render production hosts can restore sessions.
+- Helmet sets restrictive API CSP/HSTS, no frames and no MIME sniffing. CORS and Origin checks accept only CLIENT_URL. Refresh cookies are host-only/httpOnly, Secure in production, SameSite Strict, limited to the auth path. The deployed same-origin Vercel /api proxy was verified with browser session restore and explicit rotation/replay checks.
 - Access tokens stay in memory. Refresh token digests rotate, replay revokes the family. Email/reset tokens are hashed, single use and expiring. Brute-force/global/AI rate limits, body/image limits, Zod strict schemas and Mongo-operator rejection are active.
 - Images are byte-sniffed JPEG/PNG/WebP only and reencoded to WebP by Cloudinary; HTML/SVG/local serving is not permitted. This is file-type/reencoding safety, not antivirus certification.
 - React escapes user strings. No raw user HTML is rendered. Mongo queries use explicit fields and values. API errors never include stacks; internal error messages are hidden.
@@ -22,4 +22,4 @@ A full reachable git-history pattern scan found no provider token, private-key o
 
 ## Limits
 
-Rate-limit and cache state are process-local unless explicitly shared. Multi-instance abuse coordination, production proxy/CSP behavior, external credentials, backup retention and live smoke remain deployment verification gates. No deployment/production-readiness claim follows from these local tests.
+Rate-limit and cache state are process-local unless explicitly shared. Multi-instance abuse coordination, external delivery credentials and backup retention remain real-service gates. Live HTTPS/CSP, refresh replay and socket isolation passed on the accepted synthetic demo; no penetration-test or production-readiness claim follows.

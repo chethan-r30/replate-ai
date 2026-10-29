@@ -168,6 +168,9 @@ it('explores filters, map, empty/error and pagination states', async () => {
   fireEvent.change(screen.getByLabelText('Radius (km)'), {
     target: { value: 20 },
   });
+  fireEvent.change(screen.getByLabelText('Pickup by (local time)'), {
+    target: { value: '2026-10-29T09:00' },
+  });
   fireEvent.click(screen.getByText('Show map'));
   expect(await screen.findByText('Map ready')).toBeTruthy();
   fireEvent.click(screen.getByText('Hide map'));
