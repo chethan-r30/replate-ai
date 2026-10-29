@@ -53,7 +53,16 @@ export async function uploadImage(file, path = '/uploads') {
   if (!file || file.size > 5 * 1024 * 1024)
     throw new Error('Choose an image under 5 MiB');
   // Snapshot bytes before multipart transport; selected file backing stores can change.
-  const bytes = await file.arrayBuffer();
+  let bytes;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      bytes = await file.arrayBuffer();
+      break;
+    } catch (e) {
+      if (attempt === 2 || e.name !== 'NotFoundError') throw e;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
   const body = new FormData();
   body.append(
     'file',

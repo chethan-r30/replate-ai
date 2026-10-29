@@ -33,3 +33,25 @@ it('rejects oversized input before allocating a byte snapshot or request', async
   expect(arrayBuffer).not.toHaveBeenCalled();
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it('retries transient selected-file backing error without duplicating a server request', async () => {
+  const fetch = vi.fn(async () => ({
+    ok: true,
+    json: async () => ({ data: { url: '/synthetic' } }),
+  }));
+  vi.stubGlobal('fetch', fetch);
+  const e = new Error('temporary backing file');
+  e.name = 'NotFoundError';
+  const arrayBuffer = vi
+    .fn()
+    .mockRejectedValueOnce(e)
+    .mockResolvedValue(new Uint8Array([1]).buffer);
+  await uploadImage({
+    name: 'image.png',
+    type: 'image/png',
+    size: 1,
+    arrayBuffer,
+  });
+  expect(arrayBuffer).toHaveBeenCalledTimes(2);
+  expect(fetch).toHaveBeenCalledOnce();
+});

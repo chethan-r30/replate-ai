@@ -36,6 +36,7 @@ export default function ListingForm() {
   const [ai, setAi] = useState(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [retryFile, setRetryFile] = useState(null);
   const [uploaded, setUploaded] = useState('');
   const [image, setImage] = useState(null);
   const org = useQuery({
@@ -126,10 +127,13 @@ export default function ListingForm() {
   async function upload(file) {
     if (!file) return;
     setUploading(true);
+    setRetryFile(file);
     setError('');
     try {
       const data = await uploadImage(file);
       setValue('photo', data.url);
+      setRetryFile(null);
+      setError('');
       setUploaded(data.url);
     } catch (e) {
       setError(e.message);
@@ -292,6 +296,15 @@ export default function ListingForm() {
             onChange={(e) => upload(e.target.files[0])}
           />
         </label>
+        {retryFile && !uploading && (
+          <button
+            type="button"
+            className="underline"
+            onClick={() => upload(retryFile)}
+          >
+            Retry photo upload
+          </button>
+        )}
         {uploading && <p role="status">Uploading photo...</p>}
         {uploaded && (
           <div className="sm:col-span-2">
