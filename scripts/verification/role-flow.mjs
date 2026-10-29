@@ -57,10 +57,57 @@ try {
   }
   browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage({
+    permissions: ['geolocation'],
+    geolocation: { latitude: 12.97, longitude: 77.59 },
     viewport: process.env.MOBILE
       ? { width: 390, height: 844 }
       : { width: 1280, height: 900 },
   });
+  await page.goto('http://localhost:5173/listings');
+  await page.context().clearPermissions();
+  await page
+    .getByRole('button', { name: 'Use my location', exact: true })
+    .click();
+  await page
+    .getByText('We could not access your location.', { exact: false })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Use map center', exact: true })
+    .click();
+  await page
+    .getByText('Location selected. Check or adjust the map pin.')
+    .waitFor();
+  await page.waitForFunction(() => {
+    const tiles = [...document.querySelectorAll('.leaflet-tile')];
+    return (
+      tiles.length > 0 &&
+      tiles.every(
+        (tile) =>
+          tile.complete &&
+          tile.naturalWidth > 0 &&
+          tile.classList.contains('leaflet-tile-loaded') &&
+          Number(getComputedStyle(tile).opacity) >= 0.99,
+      )
+    );
+  });
+  await page
+    .locator('.leaflet-container')
+    .screenshot({
+      path:
+        root +
+        '/test-results/location-map-' +
+        (process.env.MOBILE ? 'mobile' : 'desktop') +
+        '.png',
+    });
+  await page.screenshot({
+    path:
+      root +
+      '/test-results/location-manual-' +
+      (process.env.MOBILE ? 'mobile' : 'desktop') +
+      '.png',
+    fullPage: true,
+  });
+  await page.context().grantPermissions(['geolocation']);
   const login = async (email) => {
     await page.goto('http://localhost:5173/login');
     await page.getByLabel('Email', { exact: true }).fill(email);
@@ -96,8 +143,6 @@ try {
       'Registration number': 'DEMO123',
       Address: '123 Demo Street',
       'IANA timezone': 'Asia/Kolkata',
-      Latitude: '12.97',
-      Longitude: '77.59',
       'Daily meals capacity': '100',
       'Proof document URL': 'https://example.com/proof',
       'Opening hour (0-24)': '0',
@@ -105,6 +150,12 @@ try {
     };
     for (const [label, value] of Object.entries(fields))
       await page.getByLabel(label, { exact: true }).fill(value);
+    await page
+      .getByRole('button', { name: 'Use my location', exact: true })
+      .click();
+    await page
+      .getByText('Current location selected.', { exact: false })
+      .waitFor();
     await page
       .getByRole('button', { name: 'Submit for review', exact: true })
       .click();
@@ -151,9 +202,7 @@ try {
   await page
     .getByLabel('Pickup ends', { exact: true })
     .fill(local(new Date(Date.now() + 3600000)));
-  await page
-    .getByRole('button', { name: 'Use organization coordinates' })
-    .click();
+  await page.getByRole('button', { name: 'Use organization location' }).click();
   await page.getByRole('checkbox').check();
   await page
     .getByRole('button', { name: 'Review confirmed. Save listing' })

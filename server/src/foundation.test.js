@@ -40,6 +40,17 @@ describe('foundation', () => {
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ success: false, message: 'Not found' });
   });
+  it('keeps health probes outside user limits without exempting API traffic', async () => {
+    const app = createApp(parseEnv({ ...valid, RATE_LIMIT_MAX: 2 }));
+    for (let n = 0; n < 5; n++)
+      expect((await request(app).get('/api/v1/health')).status).toBe(200);
+    expect((await request(app).get('/api/v1/health?bad=true')).status).toBe(
+      400,
+    );
+    expect((await request(app).get('/unknown')).status).toBe(404);
+    expect((await request(app).get('/unknown')).status).toBe(404);
+    expect((await request(app).get('/unknown')).status).toBe(429);
+  });
   it('rejects unknown query fields and Mongo operators', async () => {
     const app = createApp(parseEnv(valid));
     expect((await request(app).get('/api/v1/health?foo=bar')).status).toBe(400);

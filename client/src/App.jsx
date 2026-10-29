@@ -1,3 +1,4 @@
+import AppUpdate from './components/AppUpdate.jsx';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 const Explore = lazy(() => import('./pages/Explore.jsx'));
@@ -161,6 +162,7 @@ export default function App() {
         <a href="#main" className="skip">
           Skip to content
         </a>
+        <AppUpdate />
         <header className="border-b border-stone-200 dark:border-stone-700">
           <nav
             aria-label="Main navigation"

@@ -1,4 +1,5 @@
-// Browse with explicit coordinates; no silent location permission request.
+import LocationPicker from '../components/LocationPicker.jsx';
+// Location permission is optional; map selection provides a manual alternative.
 import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api.js';
@@ -75,20 +76,23 @@ export default function Explore() {
             }
           />
         </label>
-        {['lat', 'lng'].map((name) => (
-          <label className="text-sm" key={name}>
-            {name === 'lat' ? 'Latitude' : 'Longitude'}
-            <input
-              className="field mt-1"
-              type="number"
-              step="any"
-              value={filters[name]}
-              onChange={(e) =>
-                setFilters({ ...filters, [name]: e.target.value, page: 1 })
-              }
-            />
-          </label>
-        ))}
+        <LocationPicker
+          optional
+          label="Search area"
+          value={
+            filters.lat !== ''
+              ? { lat: Number(filters.lat), lng: Number(filters.lng) }
+              : null
+          }
+          onChange={(point) =>
+            setFilters({
+              ...filters,
+              lat: point?.lat ?? '',
+              lng: point?.lng ?? '',
+              page: 1,
+            })
+          }
+        />
         <label className="text-sm">
           Pickup by (local time)
           <input
