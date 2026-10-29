@@ -70,6 +70,10 @@ export function createApp(config) {
   );
   app.use(
     rateLimit({
+      // Provider probes run every5seconds; counting them can mark a healthy API down.
+      skip: (req) =>
+        req.method === 'GET' &&
+        ['/api/v1/health', '/api/v1/ready'].includes(req.path),
       windowMs: config.RATE_LIMIT_WINDOW_MS,
       limit: config.RATE_LIMIT_MAX,
       standardHeaders: 'draft-7',
