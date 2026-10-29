@@ -1,6 +1,6 @@
 # Deployment runbook
 
-Status: Phase9 in progress. Main contains the application after checked release PR12, but its postmerge performance trial reopened the gate. A Free Render service is provisioned, with its initial build cancelled until configuration and release checks are ready. No working live demo has passed verification. Vercel terms acknowledgement is completed with optional training OFF, and Atlas Google sign-in works. Free-demo scope was accepted; no paid upgrades or payment methods may be added.
+Verified2026-10-29: frontend https://replate-ai-sigma.vercel.app/ ; API https://replate-api.onrender.com/ . Current deployed app870afad passed full CI40760838986 and automated Vercel prebuilt40761256168. Atlas synthetic seed and live browser post-to-pickup, refresh rotation/replay, private sockets and admin/mobile layout passed. This is the accepted free demo, not production readiness. No paid upgrades, card holds or automatic-charge exposure are authorized.
 
 ## Architecture and current hosting limits
 
@@ -27,7 +27,7 @@ https://www.mongodb.com/docs/atlas/connect-to-database-deployment/
 
 ## 2. Render API
 
-render.yaml is a template, not proof of deployment. It specifies main, checksPass deploys, Docker, /api/v1/health and Free plan for review. The owner accepted free-demo sleep/reminder/email limits. Main now contains the app, but activation remains held for the current numerical performance gate and complete configuration.
+render.yaml specifies main, checksPass deploys, Docker, /api/v1/health and Free plan. The deployed service matches this configuration; free-demo sleep/reminder/email limits were accepted.
 
 Set these in Render environment settings, not committed files:
 
@@ -51,7 +51,7 @@ The backend rejects non-HTTPS production requests and trusts one proxy hop. Veri
 REPLATE_API_ORIGIN=https://your-verified-api-origin node scripts/configure-vercel.js
 ```
 
-This validates a plain HTTPS origin and puts /api rewrite BEFORE the SPA catchall. Review/commit the resulting public origin. The starter vercel.json intentionally has only SPA routing until a real origin is known; it is not a working API proxy yet.
+This validates a plain HTTPS origin and puts /api rewrite BEFORE the SPA catchall. Review/commit the resulting public origin. The committed vercel.json now proxies the verified Render origin before the SPA catchall.
 
 4. Set VITE_API_URL=/api/v1 and VITE_SOCKET_URL=the verified HTTPS Render API origin. Never put a secret into a VITE variable: it ships to every browser. Socket auth uses the in-memory bearer token, not the refresh cookie.
 5. Set Render CLIENT_URL to the exact Vercel origin. Preview URLs are not authorized automatically; test on a fixed allowed origin or explicitly configured isolated preview deployment.
@@ -67,7 +67,7 @@ Tests verify exact counts,60distinct dates, remote-target guard and no overwrite
 
 ## 5. CI/CD and monitoring
 
-Every PR runs Node20 lint,100+tests/coverage,build,desktop/mobile E2E,Docker and three independent200-user load trials; ANY missed300ms p95 fails. Main is protected. Render checksPass deploys only after branch checks; Vercel Git integration deploys main after release. No GitHub deployment secret is needed for those native integrations. Do not create deploy hooks that bypass checks.
+Every PR runs Node20 lint,100+tests/coverage,build,desktop/mobile E2E,Docker and three independent200-user load trials; ANY missed300ms p95 fails. Main is protected. Render checksPass deploys only after branch checks. Vercel remote Git builds are disabled because they reject Node20; the exact-SHA prebuilt workflow below replaces them. Do not create deploy hooks that bypass checks.
 
 Optional uptime workflow runs every6hours only when repository variable REPLATE_API_URL is set. Example after deployment:
 
@@ -87,47 +87,22 @@ The smoke script reads home,SPA deep-link,health,ready and public impact, never 
 
 Before a rollback, inspect database compatibility: code rollback does not undo committed claims. Render rollback is available subject to plan retention; Vercel can promote a prior verified deployment. Re-check ready/auth and claim consistency after rollback. Delete temporary seed IP access and test accounts/credentials when the demo ends.
 
-## Still pending
+## 7. Exact Node20 prebuilt automation
 
-Current release performance gate, final Vercel project/origin, Render CLIENT_URL, Atlas one-time seed, live API readiness, same-origin proxy/auth/socket/browser pickup verification and Phase10 final docs/fresh-clone checks. Claude/Cloudinary/SMTP still need real service keys. No production-ready claim.
+Vercel no longer accepts remote Node20 builds. Keep application builds on Node20; static assets contain no Node runtime. `.github/workflows/vercel-prebuilt.yml` builds the exact successfully checked main SHA under Node20, packages `client/dist` with `scripts/prepare-vercel-output.js`, and deploys static-only output using a separate supported CLI tooling runtime. Official routing conversion preserves root security headers, API proxy and SPA fallback. `.vercel` is ignored; never package `.env` or auth storage.
 
-### Provisioning checkpoint (2026-10-28)
+GitHub production environment must allow main only. Required environment secret: `VERCEL_TOKEN`, project-only for replate-ai. Repository variable: REPLATE_PREBUILT_DEPLOY_ENABLED=true. The workflow contains nonsecret VERCEL_ORG_ID=team_93k0oAoRqyU0cp8GicAOiDR7 and VERCEL_PROJECT_ID=prj_U5p74ZW6uNj2AflQD5iCHdo9KOzg. The workflow passes exact project/team IDs, not `--scope` or project-name lookups, because those require broader permissions. First scoped-lookup run40758434038 failed; corrected automated40761256168 succeeded. Historical failure is not hidden.
 
-A separate Atlas project ReplateAI was created, leaving existing unrelated projects unchanged. The ReplateAI cluster uses the explicitly selected Free tier ($0/hour), AWS Mumbai, no auto-scaling, no sample dataset and no automated security/user creation. No database credential or allowlist was created yet; database-scoped readWrite on the replate database and explicit hosting egress addresses are still required. No broad atlasAdmin quickstart user is needed.
+Set the secret using a secret manager or a private local environment, never command text in a shared transcript. Example with an already-secure shell variable: `printf %s "$VERCEL_TOKEN" | gh secret set VERCEL_TOKEN --env production --repo chethan-r30/replate-ai`. Do not echo the value. CLI deployment itself should use the workflow's pinned versions/flags.
 
-The user approved acknowledgement of Vercel's updated terms/privacy notice with optional model training/data sharing off. The toggle was set off and the dashboard confirmed "Opted out". The existing Vercel GitHub App was granted access only to this additional repository, retaining the pre-existing selection. Its separate permission-upgrade request was not approved. Import now recognizes replate-ai, but no deployment/project creation has been submitted. The import defaults to main, which is still bootstrap; do not deploy it until the checked release is merged.
+The project token expires2026-11-27T19:20:37.887Z. Rotate beforeNovember26: create project-only replacement, securely update production secret, verify automated deploy, revoke old token. Existing static app stays up when the token expires, but new frontend deployments stop. Private vault label: ReplateAI Vercel project deploy. Owner support follow-up is arranged before expiry.
 
-Latest CI performance regressions reopen the release gate despite earlier passes. See PERFORMANCE.md. Real API origin, database-scoped credentials/allowlist, working external email/image credentials and live smoke/demo remain outstanding. The Free Render scheduler/sleep/SMTP limitations described above remain unresolved; no paid plan was authorized.
+## 8. Actual resource and acceptance state
 
-Free-demo scope approved: keep Vercel frontend, Atlas Free and Render Free, synthetic verified accounts only, with explicit sleep/reminder/email caveats. Set VITE_DEMO_MODE=true for the deployed frontend to display these limitations and warn against entering real personal data. Render billing inspection confirmed Hobby, no card on file, current$0charges,15/25services and ample included runtime/bandwidth/build capacity. No card or billing setting was added. Without a payment method, documented quota behavior is suspension/build stop, not automatic payment. This check must be repeated before service creation; do not add payment details. Shared workspace quotas still matter to existing services. Atlas replate_app now has readWrite@replate only, restricted to ReplateAI; password stored securely, no network allowlist yet.
+Atlas project ReplateAI uses Free Mumbai cluster, readWrite@replate user restricted to that cluster. Only Render egress74.220.52.0/24 and74.220.60.0/24 remain allowed. Seed-machine IP was temporary and removed. Render is Free Singapore Docker service, health /api/v1/health, main after successful CI, exact CLIENT_URL=https://replate-ai-sigma.vercel.app. No billing settings/card changed.
 
-### Provisioning continuation (2026-10-28)
+Seed transaction:1admin,3restaurants,3NGOs,20listings,180history rows/60days. Password is private vault item ReplateAI synthetic demo accounts. The live acceptance added one synthetic12-serving listing and completed it; another isolation test claim was cancelled. Public count21 and synthetic meals12 were observed. Listings have real expiry rules; do not promise seeded food stays available indefinitely. Create fresh synthetic examples if windows expire, not real pickup offers.
 
-Render service: https://dashboard.render.com/web/srv-dbh3g761egvs739c2vp0/settings . Assigned API origin https://replate-api.onrender.com/ is not yet a verified working API. Singapore, Docker ./server/Dockerfile, root context, main, Free $0, health /api/v1/health, auto-deploy After CI Checks Pass. First automatic build was cancelled while required configuration was incomplete. No card was added; no paid add-ons or preview instances. Billing was rechecked Hobby/no card/low shared usage before creation.
+Refresh-cookie attributes and replay rejection, browser session restore, own-vs-unrelated Socket.IO room isolation and390px admin/dashboard layout passed. Live public health/readiness/impact and SPA routes passed. Automated signup-to-pickup also passes desktop/mobile against disposable infrastructure. External SMTP, Cloudinary and Anthropic remain unconfigured. Render Free does not offer production reminder timing; no artificial keepalive was added. Uptime variable was corrected and actual run40797914282 passed; schedule remains every6hours.
 
-Atlas IP Access List now contains only the two Render Singapore egress ranges shown by this service:74.220.52.0/24 and74.220.60.0/24, both Active. They are shared regional ranges, not dedicated addresses. No0.0.0.0/0 entry. User replate_app remains readWrite@replate, restricted to ReplateAI. The actual Node driver URI was acquired and its credentialed version saved directly in Render without printing it. Separate JWT secrets were generated in Render and saved. CLIENT_URL still awaits the actual final Vercel origin. Nonsecret NODE_ENV/PORT/expiry/model values are saved. No seed-machine IP or demo data has been added yet; one-time seed credential use awaits owner approval.
-
-The frontend proxy config uses the actual Render origin and stays ahead of SPA fallback. Vercel import was inspected with Vite, repository root, npm ci, npm run build -w client, client/dist; demo/API/socket public variables were prepared but the form was not submitted. Re-enter them on the next import. Do not send an assigned or frontend-only URL as a completed demo.
-
-### Node20 prebuilt deployment (verified 2026-10-29)
-
-Vercel stopped accepting remote Node20 builds. Do not change the application's Node20 requirement just to bypass this. The verified alternative builds browser assets under Node20 locally or in GitHub Actions and uploads static-only Build Output API files. No Node server function runs on Vercel. The deployment CLI itself can run on a currently supported tooling Node version independently of the application build.
-
-```sh
-VITE_API_URL=/api/v1 VITE_SOCKET_URL=https://replate-api.onrender.com VITE_DEMO_MODE=true npm run build -w client
-node scripts/prepare-vercel-output.js
-npx vercel@65.5.0 login
-npx vercel@65.5.0 deploy --prebuilt --prod --scope chethan-r30s-projects --project replate-ai --yes
-```
-
-Run the first two commands under Node20. The packaging script copies only client/dist and transforms vercel.json headers/proxy/SPA routing with the official Vercel routing utility. It explicitly matches the root pathname for security headers. Never put .env, source credentials or CLI auth storage into static output. .vercel is gitignored. CLI login uses the ordinary first-party device flow; never export browser cookies.
-
-Verified stable frontend: https://replate-ai-sigma.vercel.app/ . API: https://replate-api.onrender.com/ . The public home/login warning and layout were inspected. CSP, frame denial and nosniff were checked, along with SPA deep links. Render CLIENT_URL is the stable frontend origin. Read-only smoke checks passed home, SPA, API health, readiness and public impact. This is not final acceptance: seeded posting-to-pickup, refresh and sockets remain pending.
-
-The prebuilt workflow is configured with REPLATE_PREBUILT_DEPLOY_ENABLED=true and a project-only VERCEL_TOKEN in GitHub's production environment. The first automatic main release remains to be verified. Never commit the token or expose it to pull requests. It runs only after successful main Foundation checks, checks out that exact tested SHA, rejects superseded releases, and serializes production deploys. Vercel Git remote builds reject Node20. vercel.json disables that obsolete route with git.deploymentEnabled=false, following https://vercel.com/docs/project-configuration/git-configuration . Manual authenticated prebuilt deployment is verified; configured automation is not yet an observed successful automated deployment.
-
-### Prebuilt deployment credential maintenance
-
-A project-only token for prj_U5p74ZW6uNj2AflQD5iCHdo9KOzg is stored as VERCEL_TOKEN in the GitHub production environment, restricted to main. Provider token metadata explicitly reports scope=project-only, not team-wide or full-account. The dashboard displays expiry November27,2026 (UTC timestamp 2026-11-27T19:20:37.887Z). Rotate before November26,2026: create a replacement with only replate-ai project access, update the production environment secret securely, verify an automated deployment, then revoke the previous token. Expiry stops future frontend deploys; the existing static deployment continues. The token is also saved privately as ReplateAI Vercel project deploy. No token value belongs in a report or repository. Automation is not indefinitely ready without rotation.
-
-The first automated prebuilt run40758434038 failed before upload because CLI --scope tried a user-level lookup forbidden to project-only tokens. CI now targets the exact project using VERCEL_ORG_ID and VERCEL_PROJECT_ID with no scope/project-name lookup. This follows provider guidance that scoped tokens infer their team/project. No token permission was broadened. First successful automated release must still be observed.
+Before real users: configure and test external services, approve always-on scheduling if needed, recheck provider limits/billing, choose backups/retention, rotate demo credentials, inspect production-topology load and independent security/food-safety operations. No optional OAuth or Sentry implementation is claimed.
