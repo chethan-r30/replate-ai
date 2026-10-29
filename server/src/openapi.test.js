@@ -78,5 +78,6 @@ describe('OpenAPI reference', () => {
       { bearerAuth: [] },
     ]);
     expect(openapi.paths['/analytics/public'].get.security).toEqual([]);
+    expect(openapi.paths['/uploads/photo/{id}'].get.security).toEqual([]);
   });
 });
