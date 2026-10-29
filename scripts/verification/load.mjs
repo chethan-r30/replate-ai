@@ -216,7 +216,7 @@ try {
   if (process.env.GITHUB_STEP_SUMMARY)
     await writeFile(
       process.env.GITHUB_STEP_SUMMARY,
-      `### 200-connection load evidence\n\nSearch p95: ${output.search.p95Ms.toFixed(2)}ms. Claim p95: ${output.claim.p95Ms.toFixed(2)}ms. Persisted claims: ${output.persistedClaims}. Errors: ${output.search.errors + output.claim.errors}.\n\nLatency target: below 300ms. This job enforces both latency and correctness; a missed target fails the job.\n`,
+      `### 200-connection load evidence\n\nSearch p95: ${output.search.p95Ms.toFixed(2)}ms. Claim p95: ${output.claim.p95Ms.toFixed(2)}ms. Persisted claims: ${output.persistedClaims}. Errors: ${output.search.errors + output.claim.errors}.\n\nLatency target: below 300ms. Latency enforcement: ${process.env.LOAD_ENFORCE_LATENCY !== 'false'}. Correctness/error/count gates always enforced. User-approved demo exception retains measured misses, not a speed pass.\n`,
       { flag: 'a' },
     );
   console.log(JSON.stringify(output, null, 2));
@@ -228,7 +228,10 @@ try {
     throw new Error('Unexpected load response failures');
   if (output.reservedListings !== 200)
     throw new Error('Reservation count mismatch');
-  if (!(output.search.p95Ms < 300 && output.claim.p95Ms < 300))
+  if (
+    process.env.LOAD_ENFORCE_LATENCY !== 'false' &&
+    !(output.search.p95Ms < 300 && output.claim.p95Ms < 300)
+  )
     throw new Error('API p95 must stay below 300ms at 200 connections');
 } finally {
   if (server) {
