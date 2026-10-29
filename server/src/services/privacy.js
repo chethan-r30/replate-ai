@@ -1,3 +1,4 @@
+import { ProofUpload } from '../models/ProofUpload.js';
 import { disconnectUser } from './realtime.js';
 import { clearDevInbox } from '../lib/mail.js';
 // Erase account PII while preserving non-identifying food and pickup history.
@@ -83,6 +84,10 @@ export async function deleteAccount(user) {
         { $unset: { comment: 1 } },
       );
     }
+    await ProofUpload.updateMany(
+      { owner: user._id },
+      { $set: { revoked: true } },
+    );
     await RefreshToken.deleteMany({ user: user._id });
     await ActionToken.deleteMany({ user: user._id });
     await Notification.deleteMany({ user: user._id });

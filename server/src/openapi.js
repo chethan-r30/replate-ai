@@ -259,6 +259,21 @@ paths['/uploads'].post.requestBody = {
     },
   },
 };
+add('post', '/uploads/proof', 'Upload owner-private organization proof image', {
+  created: true,
+  description:
+    'JPEG/PNG/WebP under5MB, reencoded into authenticated Cloudinary storage. Returns owner/admin-only API path, never origin URL.',
+});
+paths['/uploads/proof'].post.requestBody = paths['/uploads'].post.requestBody;
+add(
+  'get',
+  '/uploads/proof/{id}',
+  'Read private proof bytes as owner or admin',
+  {
+    description:
+      'Returns image/webp, no-store;404 for unrelated or revoked uploads. No redirects or signed origin URL disclosure.',
+  },
+);
 export const openapi = {
   openapi: '3.1.0',
   info: {

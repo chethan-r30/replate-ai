@@ -389,3 +389,24 @@ it('reports moderation, AI field filling and failed form requests', async () => 
   fireEvent.click(screen.getByText('Suggest listing details'));
   expect(await screen.findByDisplayValue('AI bread')).toBeTruthy();
 });
+
+it('uploads organization proof directly and rejects unsafe file types', async () => {
+  dataOverrides['/uploads/proof'] = {
+    url: '/uploads/proof/507f1f77bcf86cd799439011',
+  };
+  view(<Organization />);
+  fireEvent.change(screen.getByLabelText('Upload verification proof image'), {
+    target: {
+      files: [new File(['unsafe'], 'proof.svg', { type: 'image/svg+xml' })],
+    },
+  });
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    'Choose a JPEG',
+  );
+  fireEvent.change(screen.getByLabelText('Upload verification proof image'), {
+    target: {
+      files: [new File(['synthetic'], 'proof.png', { type: 'image/png' })],
+    },
+  });
+  expect(await screen.findByText('View private proof')).toBeTruthy();
+});

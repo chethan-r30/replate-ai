@@ -1,3 +1,4 @@
+import ProofLink from '../components/ProofLink.jsx';
 import LocationPicker from '../components/LocationPicker.jsx';
 // Organizations explicitly choose timezone and submit proof for admin review.
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api.js';
+import { api, uploadImage } from '../lib/api.js';
 import { Heading, Status } from '../components/States.jsx';
 const schema = z.object({
   name: z.string().min(2),
@@ -22,7 +23,10 @@ const schema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   capacity: z.coerce.number().int().positive(),
-  proof: z.string().url(),
+  proof: z.union([
+    z.string().url(),
+    z.string().regex(/^\/uploads\/proof\/[a-f0-9]{24}$/),
+  ]),
   start: z.coerce.number().min(0).max(24),
   end: z.coerce.number().min(0).max(24),
   categories: z.string(),
@@ -36,6 +40,7 @@ export default function OrganizationPage() {
   });
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
   const {
     register,
     handleSubmit,
@@ -85,6 +90,24 @@ export default function OrganizationPage() {
       qc.invalidateQueries({ queryKey: ['organization'] });
     } catch (e) {
       setError(e.message);
+    }
+  }
+  async function uploadProof(file) {
+    if (!file) return;
+    setUploading(true);
+    setError('');
+    try {
+      if (
+        file.size > 5 * 1024 * 1024 ||
+        !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+      )
+        throw new Error('Choose a JPEG, PNG or WebP proof image under 5MB');
+      const data = await uploadImage(file, '/uploads/proof');
+      setValue('proof', data.url, { shouldValidate: true });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setUploading(false);
     }
   }
   function edit() {
@@ -141,7 +164,7 @@ export default function OrganizationPage() {
           ['address', 'Address'],
           ['timezone', 'IANA timezone'],
           ['capacity', 'Daily meals capacity'],
-          ['proof', 'Proof document URL'],
+
           ['start', 'Opening hour (0-24)'],
           ['end', 'Closing hour (0-24)'],
           ['categories', 'Accepted categories, comma separated'],
@@ -161,11 +184,40 @@ export default function OrganizationPage() {
             )}
           </label>
         ))}
+        <div className="sm:col-span-2">
+          <label className="text-sm font-semibold">
+            Upload verification proof image
+            <input
+              className="field mt-2"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={uploading}
+              onChange={(e) => uploadProof(e.target.files?.[0])}
+            />
+          </label>
+          <p className="mt-2 text-sm">
+            JPEG, PNG or WebP under 5MB. Uploaded images are readable only by
+            you and admins. Do not include unnecessary personal information.
+          </p>
+          {uploading && <p role="status">Uploading proof...</p>}
+          {watch('proof')?.startsWith('/uploads/proof/') ? (
+            <ProofLink url={watch('proof')} />
+          ) : (
+            <label className="mt-3 block text-sm">
+              Or an externally hosted proof URL
+              <input className="field mt-2" {...register('proof')} />
+            </label>
+          )}
+          {errors.proof && (
+            <p role="alert">
+              Upload proof or provide a valid externally hosted URL.
+            </p>
+          )}
+        </div>
         <p className="text-sm text-stone-600 dark:text-stone-400 sm:col-span-2">
           Categories: cooked, bakery, produce, packaged, dairy. Tags: veg,
-          vegan, halal, contains-nuts. Upload image proof through the upload
-          service when configured, or provide your hosted document URL. Proof is
-          private to you and admins.
+          vegan, halal, contains-nuts. Externally hosted URLs keep the privacy
+          settings of their host; the app cannot make them private.
         </p>
         {error && (
           <p role="alert" className="text-red-700 sm:col-span-2">
@@ -177,7 +229,10 @@ export default function OrganizationPage() {
             {notice}
           </p>
         )}
-        <button disabled={isSubmitting} className="button sm:col-span-2">
+        <button
+          disabled={isSubmitting || uploading}
+          className="button sm:col-span-2"
+        >
           {isSubmitting ? 'Submitting...' : 'Submit for review'}
         </button>
       </form>

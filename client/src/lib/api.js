@@ -48,3 +48,26 @@ export async function api(path, { method = 'GET', body, retry = true } = {}) {
   if (!response.ok) throw new Error(data.message || 'Request failed');
   return data.data;
 }
+
+export async function uploadImage(file, path = '/uploads') {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await fetch(`${config.VITE_API_URL}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    body,
+    credentials: 'include',
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Upload failed');
+  return data.data;
+}
+export async function readProof(path) {
+  const response = await fetch(`${config.VITE_API_URL}${path}`, {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    credentials: 'include',
+  });
+  if (!response.ok)
+    throw new Error('Could not open proof. Please sign in again or retry.');
+  return response.blob();
+}

@@ -90,15 +90,13 @@ try {
       )
     );
   });
-  await page
-    .locator('.leaflet-container')
-    .screenshot({
-      path:
-        root +
-        '/test-results/location-map-' +
-        (process.env.MOBILE ? 'mobile' : 'desktop') +
-        '.png',
-    });
+  await page.locator('.leaflet-container').screenshot({
+    path:
+      root +
+      '/test-results/location-map-' +
+      (process.env.MOBILE ? 'mobile' : 'desktop') +
+      '.png',
+  });
   await page.screenshot({
     path:
       root +
@@ -144,7 +142,7 @@ try {
       Address: '123 Demo Street',
       'IANA timezone': 'Asia/Kolkata',
       'Daily meals capacity': '100',
-      'Proof document URL': 'https://example.com/proof',
+      'Or an externally hosted proof URL': 'https://example.com/proof',
       'Opening hour (0-24)': '0',
       'Closing hour (0-24)': '24',
     };
@@ -156,6 +154,15 @@ try {
     await page
       .getByText('Current location selected.', { exact: false })
       .waitFor();
+    if (role === 'restaurant')
+      await page.screenshot({
+        path:
+          root +
+          '/test-results/proof-form-' +
+          (process.env.MOBILE ? 'mobile' : 'desktop') +
+          '.png',
+        fullPage: true,
+      });
     await page
       .getByRole('button', { name: 'Submit for review', exact: true })
       .click();
