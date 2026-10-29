@@ -128,3 +128,7 @@ Native generated-write PR30 commit7955231 full CI40753416604 passes lint/105test
 Exact e6546a2 run40753930263 failed third claim p95=325.06ms (prior192.19/276.57ms),0errors/200correct. Durable commit135ms dominated; mutation update19ms/insert5ms/find8ms. A CPU profile of the unchanged search-to-claim workload showed repeated public JSON serialization dominating API CPU (2646samples versus694GC), despite single-flight DB reads. Next change caches the identical public JSON wire representation within the same1second mutation-invalidated cache, removing redundant date/ObjectId serialization and GC pressure without any permission cache or durability change.
 
 Serialized-search688be2b CI40755046909 failed claim303.53ms (others247.23/240.73ms),0errors/200correct. The failing trial fragmented into7serial transactions despite API request p95=136.51ms and commit4ms. Next bounded scheduler allows at most2overlapping transactions to prevent head-of-line waits for tail arrivals. Transaction conditional reservations, conflict retries, commit-before-response and1000outstanding cap are retained.
+
+### Final Phase10 frontend remeasurement
+
+2026-10-29 built client after pickup filter/recommendation/forecast UI changes: home100/100/96/91, listings95/100/96/91, login100/100/96/91, impact92/100/96/91. All key-page local90targets pass; mobile axe zero tested violations. Measurement tooling Node22; app build/runtime Node20. Initial route110.02KB gzip. These local scores do not certify free-host cold-start performance.
