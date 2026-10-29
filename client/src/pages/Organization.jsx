@@ -41,6 +41,7 @@ export default function OrganizationPage() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [retryFile, setRetryFile] = useState(null);
   const [newProof, setNewProof] = useState('');
   const {
     register,
@@ -96,6 +97,7 @@ export default function OrganizationPage() {
   async function uploadProof(file) {
     if (!file) return;
     setUploading(true);
+    setRetryFile(file);
     setError('');
     try {
       if (
@@ -106,6 +108,8 @@ export default function OrganizationPage() {
       const data = await uploadImage(file, '/uploads/proof');
       setValue('proof', data.url, { shouldValidate: true });
       setNewProof(data.url);
+      setRetryFile(null);
+      setError('');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -216,6 +220,15 @@ export default function OrganizationPage() {
               }}
             >
               Remove newly uploaded proof
+            </button>
+          )}
+          {retryFile && !uploading && (
+            <button
+              type="button"
+              className="underline"
+              onClick={() => uploadProof(retryFile)}
+            >
+              Retry proof upload
             </button>
           )}
           {uploading && <p role="status">Uploading proof...</p>}
