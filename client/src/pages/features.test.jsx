@@ -405,7 +405,15 @@ it('uploads organization proof directly and rejects unsafe file types', async ()
   );
   fireEvent.change(screen.getByLabelText('Upload verification proof image'), {
     target: {
-      files: [new File(['synthetic'], 'proof.png', { type: 'image/png' })],
+      files: [
+        Object.assign(
+          new File(['synthetic'], 'proof.png', { type: 'image/png' }),
+          {
+            arrayBuffer: async () =>
+              new TextEncoder().encode('synthetic').buffer,
+          },
+        ),
+      ],
     },
   });
   expect(await screen.findByText('View private proof')).toBeTruthy();
