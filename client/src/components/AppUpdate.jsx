@@ -50,6 +50,11 @@ export default function AppUpdate() {
             () => window.location.reload(),
             { once: true },
           );
+          // Workbox prompt workers do not claim an existing tab automatically.
+          // Reload when activation finishes, even without controllerchange.
+          waiting.addEventListener('statechange', () => {
+            if (waiting.state === 'activated') window.location.reload();
+          });
           waiting.postMessage({ type: 'SKIP_WAITING' });
         }}
       >

@@ -8,7 +8,7 @@ afterEach(() => {
   delete navigator.serviceWorker;
 });
 it('offers an explicit update for a waiting offline shell without discarding a form automatically', async () => {
-  const worker = { postMessage: vi.fn() };
+  const worker = { postMessage: vi.fn(), addEventListener: vi.fn() };
   const serviceWorker = {
     getRegistrations: vi.fn().mockResolvedValue([
       {
