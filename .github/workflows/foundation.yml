@@ -19,7 +19,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node scripts/verification/pwa-update.mjs
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-evidence
@@ -65,7 +65,7 @@ jobs:
             cp test-results/load.json test-results/load-trial-$trial.json
           done
           test "$failed" = 0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: load-evidence
