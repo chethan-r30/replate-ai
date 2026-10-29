@@ -1,3 +1,4 @@
+import LocationPicker from '../components/LocationPicker.jsx';
 // Organizations explicitly choose timezone and submit proof for admin review.
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -18,8 +19,8 @@ const schema = z.object({
       return false;
     }
   }, 'Use a valid IANA timezone'),
-  lat: z.coerce.number().min(-90).max(90),
-  lng: z.coerce.number().min(-180).max(180),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
   capacity: z.coerce.number().int().positive(),
   proof: z.string().url(),
   start: z.coerce.number().min(0).max(24),
@@ -39,6 +40,8 @@ export default function OrganizationPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
@@ -123,13 +126,20 @@ export default function OrganizationPage() {
         onSubmit={handleSubmit(submit)}
         className="grid gap-5 sm:grid-cols-2"
       >
+        <LocationPicker
+          label="Organization location"
+          value={{ lat: watch('lat'), lng: watch('lng') }}
+          onChange={(point) => {
+            setValue('lat', point.lat, { shouldValidate: true });
+            setValue('lng', point.lng, { shouldValidate: true });
+          }}
+          error={errors.lat || errors.lng}
+        />
         {[
           ['name', 'Organization name'],
           ['registrationNo', 'Registration number'],
           ['address', 'Address'],
           ['timezone', 'IANA timezone'],
-          ['lat', 'Latitude'],
-          ['lng', 'Longitude'],
           ['capacity', 'Daily meals capacity'],
           ['proof', 'Proof document URL'],
           ['start', 'Opening hour (0-24)'],

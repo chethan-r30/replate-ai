@@ -106,3 +106,7 @@ Seed transaction:1admin,3restaurants,3NGOs,20listings,180history rows/60days. Pa
 Refresh-cookie attributes and replay rejection, browser session restore, own-vs-unrelated Socket.IO room isolation and390px admin/dashboard layout passed. Live public health/readiness/impact and SPA routes passed. Automated signup-to-pickup also passes desktop/mobile against disposable infrastructure. External SMTP, Cloudinary and Anthropic remain unconfigured. Render Free does not offer production reminder timing; no artificial keepalive was added. Uptime variable was corrected and actual run40797914282 passed; schedule remains every6hours.
 
 Before real users: configure and test external services, approve always-on scheduling if needed, recheck provider limits/billing, choose backups/retention, rotate demo credentials, inspect production-topology load and independent security/food-safety operations. No optional OAuth or Sentry implementation is claimed.
+
+### Provider health probes and rate limits
+
+Health/ready GETs are excluded from the user-facing global limiter because Render probes every5seconds from a shared internalIP. They still enforce HTTPS/origin/query validation and readiness checks. Do not exempt forwardedIP ranges or user API traffic. A100/15minute limiter previously made healthy probes429and Render return502; regression covers the corrected boundary. After deployment observe at least15minutes of provider probes and readiness before closing an equivalent incident.
