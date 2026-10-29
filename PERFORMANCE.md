@@ -132,3 +132,5 @@ Serialized-search688be2b CI40755046909 failed claim303.53ms (others247.23/240.73
 ### Final Phase10 frontend remeasurement
 
 2026-10-29 built client after pickup filter/recommendation/forecast UI changes: home100/100/96/91, listings95/100/96/91, login100/100/96/91, impact92/100/96/91. All key-page local90targets pass; mobile axe zero tested violations. Measurement tooling Node22; app build/runtime Node20. Initial route110.02KB gzip. These local scores do not certify free-host cold-start performance.
+
+PWA-only follow-up PR39 initial run40802506209 found claim trial2p95=480.35ms (others217.92/204.71ms), search82.36/85.72/71.41ms, zeroerrors/200distinct each. Backend source was unchanged from main; commitTransactionp95=255ms dominated two small batches. This is a retained missed gate, not a functional failure or justification to weaken300ms, remove transactions or declare repeatability from prior passes. Corrected PWA lifecycle head must pass its own exact checks before release.
