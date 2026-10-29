@@ -56,6 +56,7 @@ export function createAiClient(config) {
               messages,
               max_completion_tokens: request.max_tokens,
               temperature: 0.1,
+              reasoning_effort: image ? 'none' : 'low',
               ...(request.max_tokens === 800
                 ? { response_format: { type: 'json_object' } }
                 : {}),
