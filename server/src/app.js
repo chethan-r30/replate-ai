@@ -1,3 +1,5 @@
+import swaggerUi from 'swagger-ui-express';
+import { openapi } from './openapi.js';
 import { profile } from './lib/profile.js';
 // Compose security middleware and versioned API routes without opening a port.
 import express from 'express';
@@ -111,6 +113,29 @@ export function createApp(config) {
   app.use('/api/v1/analytics', analyticsRoutes(config));
   app.use('/api/v1/notifications', notificationRoutes(config));
   app.use('/api/v1/admin', adminRoutes(config));
+  app.get('/api/openapi.json', (_req, res) => res.json(openapi));
+  // Docs load only local assets, with no credential persistence or mutation UI.
+  app.use(
+    '/api/docs',
+    helmet.contentSecurityPolicy({
+      directives: {
+        defaultSrc: ["'none'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    }),
+    swaggerUi.serve,
+    swaggerUi.setup(openapi, {
+      swaggerOptions: {
+        supportedSubmitMethods: [],
+        persistAuthorization: false,
+      },
+      customSiteTitle: 'ReplateAI API reference',
+    }),
+  );
   app.use(notFound);
   app.use(errorHandler);
   return app;

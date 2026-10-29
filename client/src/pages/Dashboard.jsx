@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [feedback, setFeedback] = useState({});
   const [message, setMessage] = useState('');
   const [page, setPage] = useState(1);
+  const [forecastCategory, setForecastCategory] = useState('bakery');
   const org = useQuery({
     queryKey: ['organization', user.id],
     enabled: user.role !== 'admin' && user.role !== 'volunteer',
@@ -44,10 +45,15 @@ export default function Dashboard() {
     enabled: user.role === 'restaurant',
     queryFn: () => api(`/listings/mine?page=${page}`),
   });
+  const suggestedFood = useQuery({
+    queryKey: ['suggested-food', user.id, page],
+    enabled: user.role === 'ngo' && Boolean(org.data),
+    queryFn: () => api(`/ai/recommended-listings?page=${page}`),
+  });
   const forecast = useQuery({
-    queryKey: ['forecast', user.id],
+    queryKey: ['forecast', user.id, forecastCategory],
     enabled: user.role === 'restaurant' && Boolean(org.data),
-    queryFn: () => api('/ai/forecast'),
+    queryFn: () => api(`/ai/forecast?category=${forecastCategory}`),
   });
   const notifications = useQuery({
     queryKey: ['notifications', user.id],
@@ -73,6 +79,13 @@ export default function Dashboard() {
       import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000',
       { auth: { token: getAccessToken() } },
     );
+    // Every connect includes reconnect: persisted state may have changed offline.
+    socket.on('connect', () => {
+      qc.invalidateQueries({ queryKey: ['notifications', user.id] });
+      qc.invalidateQueries({ queryKey: ['claims'] });
+      qc.invalidateQueries({ queryKey: ['my-listings'] });
+      qc.invalidateQueries({ queryKey: ['suggested-food'] });
+    });
     socket.on('notification', () => {
       qc.invalidateQueries({ queryKey: ['notifications', user.id] });
       qc.invalidateQueries({ queryKey: ['claims'] });
@@ -114,6 +127,40 @@ export default function Dashboard() {
           <Link className="button secondary" to="/organization">
             Organization & preferences
           </Link>
+        )}
+        {user.role === 'ngo' && org.data && (
+          <section className="mb-10" aria-labelledby="suggested-food-title">
+            <h2
+              id="suggested-food-title"
+              className="mb-4 text-2xl font-semibold"
+            >
+              Recommended for your NGO
+            </h2>
+            <p className="mb-4 text-sm">
+              Within10km, ranked by distance, pickup hours, preferences and
+              remaining capacity. Review safety yourself.
+            </p>
+            <Status query={suggestedFood}>
+              {suggestedFood.data?.items?.length ? (
+                <div className="grid gap-5 md:grid-cols-3">
+                  {suggestedFood.data.items.map((listing) => (
+                    <div key={listing._id}>
+                      <ListingCard listing={listing} />
+                      <p className="mt-2 text-sm">
+                        Match {listing.match.score}/100 ·{' '}
+                        {listing.match.explanation}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty>
+                  No available listings fit your preferences, hours and capacity
+                  nearby.
+                </Empty>
+              )}
+            </Status>
+          </section>
         )}
         {user.role === 'restaurant' && (
           <Link className="button" to="/listings/new">
@@ -229,6 +276,20 @@ export default function Dashboard() {
               <h2 className="mb-4 mt-10 text-2xl font-semibold">
                 Seven-day surplus forecast
               </h2>
+              <label className="mb-4 block text-sm">
+                Forecast category
+                <select
+                  className="field mt-1"
+                  value={forecastCategory}
+                  onChange={(e) => setForecastCategory(e.target.value)}
+                >
+                  {['cooked', 'bakery', 'produce', 'packaged', 'dairy'].map(
+                    (category) => (
+                      <option key={category}>{category}</option>
+                    ),
+                  )}
+                </select>
+              </label>
               <Status query={forecast}>
                 {forecast.data && (
                   <div className="mb-10 rounded-2xl bg-white p-5 dark:bg-stone-900">

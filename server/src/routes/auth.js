@@ -26,12 +26,13 @@ const password = z
   .regex(/[a-z]/, 'Include a lowercase letter')
   .regex(/[A-Z]/, 'Include an uppercase letter')
   .regex(/[0-9]/, 'Include a number');
-const loginSchema = z
+export const loginSchema = z
   .object({ email, password: z.string().min(1).max(72) })
   .strict();
-const tokenSchema = z
+export const tokenSchema = z
   .object({ token: z.string().regex(/^[a-f\d]{64}$/) })
   .strict();
+export const resetSchema = tokenSchema.extend({ password });
 export const registerSchema = z
   .object({
     name: z.string().trim().min(2).max(100),
@@ -232,7 +233,7 @@ export function authRoutes(config) {
     '/reset-password',
     limiter,
     asyncRoute(async (req, res) => {
-      const data = tokenSchema.extend({ password }).parse(req.body);
+      const data = resetSchema.parse(req.body);
       const hash = await bcrypt.hash(data.password, 12);
       const record = await ActionToken.findOneAndUpdate(
         {

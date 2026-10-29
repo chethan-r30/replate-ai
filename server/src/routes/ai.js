@@ -8,9 +8,14 @@ import { FoodListing } from '../models/FoodListing.js';
 import { SurplusHistory } from '../models/SurplusHistory.js';
 import { forecast, demandForecast } from '../ai/forecast.js';
 import { parseInput, parseListing, forecastInsight } from '../ai/parser.js';
-import { recommendations } from '../services/matching.js';
+import { recommendations, recommendedListings } from '../services/matching.js';
 import { sharedGet, sharedSet } from '../services/shared-cache.js';
-import { requireAuth, requireRole, objectId } from '../middleware/auth.js';
+import {
+  requireAuth,
+  requireRole,
+  objectId,
+  pagination,
+} from '../middleware/auth.js';
 import { AppError, asyncRoute, ok } from '../middleware/errors.js';
 export function aiRoutes(config) {
   const r = Router();
@@ -106,6 +111,16 @@ export function aiRoutes(config) {
         });
       }
       ok(res, result);
+    }),
+  );
+  r.get(
+    '/recommended-listings',
+    requireRole('ngo'),
+    asyncRoute(async (req, res) => {
+      const options = pagination.strict().parse(req.query);
+      const org = await Organization.findOne({ owner: req.user._id }).lean();
+      if (!org) throw new AppError(400, 'Create an organization first');
+      ok(res, await recommendedListings(org, options));
     }),
   );
   r.get(

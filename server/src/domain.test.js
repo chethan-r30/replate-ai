@@ -25,7 +25,12 @@ import { Organization } from './models/Organization.js';
 import { FoodListing } from './models/FoodListing.js';
 import { Claim } from './models/Claim.js';
 import { signAccess } from './lib/tokens.js';
-import { expireListings } from './jobs/expiry.js';
+import { Feedback } from './models/Feedback.js';
+import {
+  expireListings,
+  escalateMatches,
+  remindExpiring,
+} from './jobs/expiry.js';
 import { createClaim } from './services/claims.js';
 import { canTransition } from './services/claims.js';
 const config = parseEnv({
@@ -390,6 +395,112 @@ describe('core domain', () => {
       spy.mockRestore();
       await drainBackground();
     }
+  });
+  it('ranks available food for the current NGO and enforces fit and role', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const response = await request(app)
+      .get('/api/v1/ai/recommended-listings')
+      .set('Authorization', ngo.auth);
+    expect(response.status).toBe(200);
+    expect(response.body.data.items[0]._id).toBe(String(listing._id));
+    expect(response.body.data.items[0].match.eligible).toBe(true);
+    await Organization.updateOne(
+      { _id: ngo.org._id },
+      { $set: { 'preferences.dietary': ['vegan'] } },
+    );
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/recommended-listings')
+          .set('Authorization', ngo.auth)
+      ).body.data.items,
+    ).toEqual([]);
+    expect(
+      (await request(app).get('/api/v1/ai/recommended-listings')).status,
+    ).toBe(401);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/recommended-listings')
+          .set('Authorization', restaurant.auth)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/recommended-listings?limit=1000')
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(400);
+  });
+  it('uses past no-shows and real feedback rather than unmaintained org defaults', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    await Claim.create({
+      listing: listing._id,
+      restaurant: restaurant.org._id,
+      ngo: ngo.org._id,
+      status: 'no_show',
+      pickupCode: '123456',
+    });
+    await Claim.create({
+      listing: listing._id,
+      restaurant: restaurant.org._id,
+      ngo: ngo2.org._id,
+      status: 'picked_up',
+      pickupCode: '123456',
+    });
+    await Feedback.create({
+      claim: new mongoose.Types.ObjectId(),
+      from: restaurant.user._id,
+      to: ngo2.org._id,
+      rating: 5,
+    });
+    const matches = await recommendations(listing);
+    expect(matches[0]._id.toString()).toBe(ngo2.org._id.toString());
+    expect(matches[0].breakdown.reliability).toBe(1);
+    expect(
+      matches.find((x) => String(x._id) === String(ngo.org._id)).breakdown
+        .reliability,
+    ).toBe(0);
+  });
+  it('escalates only after15minutes and sends one expiry reminder', async () => {
+    for (let i = 0; i < 3; i++) await actor('ngo', `extra${i}@example.com`);
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    expect(await notifyMatches(listing._id)).toBe(3);
+    await escalateMatches();
+    expect(await Notification.countDocuments({ type: 'nearby-listing' })).toBe(
+      3,
+    );
+    await FoodListing.updateOne(
+      { _id: listing._id },
+      { $set: { lastNotifiedAt: new Date(Date.now() - 901000) } },
+    );
+    await escalateMatches();
+    expect(await Notification.countDocuments({ type: 'nearby-listing' })).toBe(
+      5,
+    );
+    await escalateMatches();
+    expect(await Notification.countDocuments({ type: 'nearby-listing' })).toBe(
+      5,
+    );
+    await FoodListing.updateOne(
+      { _id: listing._id },
+      { $set: { bestBefore: new Date(Date.now() + 600000) } },
+    );
+    await remindExpiring();
+    await remindExpiring();
+    expect(await Notification.countDocuments({ type: 'expiry-reminder' })).toBe(
+      1,
+    );
   });
   it('ranks geo candidates and notifies each NGO at most once', async () => {
     const listing = await FoodListing.create({

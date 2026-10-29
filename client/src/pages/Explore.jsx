@@ -12,6 +12,7 @@ export default function Explore() {
     lat: '',
     lng: '',
     radius: '10',
+    pickupBefore: '',
     page: 1,
   });
   const [map, setMap] = useState(false);
@@ -21,7 +22,10 @@ export default function Explore() {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(filters))
         if (value !== '' && (key !== 'radius' || filters.lat))
-          params.set(key, value);
+          params.set(
+            key,
+            key === 'pickupBefore' ? new Date(value).toISOString() : value,
+          );
       return api(`/listings?${params}`);
     },
   });
@@ -85,6 +89,17 @@ export default function Explore() {
             />
           </label>
         ))}
+        <label className="text-sm">
+          Pickup by (local time)
+          <input
+            className="field mt-1"
+            type="datetime-local"
+            value={filters.pickupBefore}
+            onChange={(e) =>
+              setFilters({ ...filters, pickupBefore: e.target.value, page: 1 })
+            }
+          />
+        </label>
         <button
           type="button"
           className="button self-end"
