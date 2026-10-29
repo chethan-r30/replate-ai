@@ -180,6 +180,57 @@ try {
         exact: true,
       }),
     });
+    if (role === 'restaurant') {
+      // Controlled synthetic proof preview exercises the authenticated byte fetch UI.
+      const { ProofUpload } = await import(
+        root + '/server/src/models/ProofUpload.js'
+      );
+      const { Organization } = await import(
+        root + '/server/src/models/Organization.js'
+      );
+      const restaurantUser = await User.findOne({
+        email: 'restaurant@demo.example',
+      });
+      const proof = await ProofUpload.create({
+        owner: restaurantUser._id,
+        publicId: 'synthetic-ui-only',
+      });
+      await Organization.updateOne(
+        { owner: restaurantUser._id },
+        { $set: { verificationDocs: [`/uploads/proof/${proof._id}`] } },
+      );
+      await page.route('**/uploads/proof/*', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'image/svg+xml',
+          body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="280"><rect width="640" height="280" fill="#e5efe8"/><text x="30" y="120" font-size="24">SYNTHETIC PROOF - UI TEST ONLY</text></svg>',
+        }),
+      );
+      await page.reload();
+      await card
+        .getByRole('button', { name: 'View private proof', exact: true })
+        .click();
+      await page
+        .getByAltText('Uploaded organization verification proof')
+        .waitFor();
+      await page.waitForFunction(() => {
+        const i = document.querySelector(
+          'img[alt="Uploaded organization verification proof"]',
+        );
+        return i?.complete && i.naturalWidth > 0;
+      });
+      await page.screenshot({
+        path:
+          root +
+          '/test-results/proof-preview-' +
+          (process.env.MOBILE ? 'mobile' : 'desktop') +
+          '.png',
+        fullPage: true,
+      });
+      await card
+        .getByRole('button', { name: 'Close proof', exact: true })
+        .click();
+    }
     await card.getByRole('button', { name: 'Approve', exact: true }).click();
     await page
       .getByRole('heading', {
