@@ -110,3 +110,11 @@ Before real users: configure and test external services, approve always-on sched
 ### Provider health probes and rate limits
 
 Health/ready GETs are excluded from the user-facing global limiter because Render probes every5seconds from a shared internalIP. They still enforce HTTPS/origin/query validation and readiness checks. Do not exempt forwardedIP ranges or user API traffic. A100/15minute limiter previously made healthy probes429and Render return502; regression covers the corrected boundary. After deployment observe at least15minutes of provider probes and readiness before closing an equivalent incident.
+
+### Optional Groq Free AI provider
+
+User-approved alternative: set AI_PROVIDER=groq, GROQ_API_KEY privately, GROQ_MODEL=openai/gpt-oss-20b for text/forecast prose, GROQ_VISION_MODEL=qwen/qwen3.8-27b for images. The vision model is preview/evaluation and may disappear; manual fallback remains mandatory. Keep Groq organization on Free, add no payment method and do not upgrade. Verify actual account plan/limits before first configured request. A key alone does not prove the account is Free. Never put keys in source, screenshots or chat.
+
+Official sources checked2026-10-29: https://console.groq.com/settings/billing/plans , https://console.groq.com/docs/billing-faqs , https://console.groq.com/docs/rate-limits , https://console.groq.com/docs/vision , https://console.groq.com/docs/models . Published per-model Free caps currently30requests/minute,1000/day,8000tokens/minute,200000/day for these two models; exact account limits can differ and are organization-wide. An image contributes2048inputtokens for the current vision model. Quota429fails to manual/numbers-only mode, never switches to paid Anthropic or upgrades an account. Existing per-user AI limits are not a guarantee against exhausting this shared quota. Numeric forecasts/matching remain local. This does not connect SMTP/images or change free-host sleep.
+
+The backend adapter uses Groq's OpenAI-compatible chat endpoint, with capped completion tokens,10second timeout, strict existing Zod output validation and human food-safety confirmation. Missing/invalid/quota/network failures preserve current safe fallbacks. No configured live success is claimed until the user's key and Free-plan evidence are verified.
