@@ -396,6 +396,46 @@ describe('core domain', () => {
       await drainBackground();
     }
   });
+  it('ranks available food for the current NGO and enforces fit and role', async () => {
+    const listing = await FoodListing.create({
+      ...food(),
+      restaurant: restaurant.org._id,
+    });
+    const response = await request(app)
+      .get('/api/v1/ai/recommended-listings')
+      .set('Authorization', ngo.auth);
+    expect(response.status).toBe(200);
+    expect(response.body.data.items[0]._id).toBe(String(listing._id));
+    expect(response.body.data.items[0].match.eligible).toBe(true);
+    await Organization.updateOne(
+      { _id: ngo.org._id },
+      { $set: { 'preferences.dietary': ['vegan'] } },
+    );
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/recommended-listings')
+          .set('Authorization', ngo.auth)
+      ).body.data.items,
+    ).toEqual([]);
+    expect(
+      (await request(app).get('/api/v1/ai/recommended-listings')).status,
+    ).toBe(401);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/recommended-listings')
+          .set('Authorization', restaurant.auth)
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get('/api/v1/ai/recommended-listings?limit=1000')
+          .set('Authorization', ngo.auth)
+      ).status,
+    ).toBe(400);
+  });
   it('uses past no-shows and real feedback rather than unmaintained org defaults', async () => {
     const listing = await FoodListing.create({
       ...food(),

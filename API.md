@@ -8,7 +8,7 @@ Version prefix: `/api/v1`. Interactive OpenAPI: https://replate-api.onrender.com
 | /organizations  | create, update, get; admin list and verify                                                                              |
 | /listings       | create/read/update/cancel, filtered geo search, nearby and mine                                                         |
 | /claims         | create, approve/reject, pickup confirmation, cancel, mine and feedback                                                  |
-| /ai             | parse-listing, forecast, recommendations/:listingId                                                                     |
+| /ai             | parse-listing, forecast, recommendations/:listingId and NGO recommended-listings                                        |
 | /analytics      | restaurant, NGO, admin and public impact                                                                                |
 | /notifications  | durable list and mark-read                                                                                              |
 | /health, /ready | Process availability and database readiness                                                                             |

@@ -45,6 +45,11 @@ export default function Dashboard() {
     enabled: user.role === 'restaurant',
     queryFn: () => api(`/listings/mine?page=${page}`),
   });
+  const suggestedFood = useQuery({
+    queryKey: ['suggested-food', user.id, page],
+    enabled: user.role === 'ngo' && Boolean(org.data),
+    queryFn: () => api(`/ai/recommended-listings?page=${page}`),
+  });
   const forecast = useQuery({
     queryKey: ['forecast', user.id, forecastCategory],
     enabled: user.role === 'restaurant' && Boolean(org.data),
@@ -79,6 +84,7 @@ export default function Dashboard() {
       qc.invalidateQueries({ queryKey: ['notifications', user.id] });
       qc.invalidateQueries({ queryKey: ['claims'] });
       qc.invalidateQueries({ queryKey: ['my-listings'] });
+      qc.invalidateQueries({ queryKey: ['suggested-food'] });
     });
     socket.on('notification', () => {
       qc.invalidateQueries({ queryKey: ['notifications', user.id] });
@@ -121,6 +127,40 @@ export default function Dashboard() {
           <Link className="button secondary" to="/organization">
             Organization & preferences
           </Link>
+        )}
+        {user.role === 'ngo' && org.data && (
+          <section className="mb-10" aria-labelledby="suggested-food-title">
+            <h2
+              id="suggested-food-title"
+              className="mb-4 text-2xl font-semibold"
+            >
+              Recommended for your NGO
+            </h2>
+            <p className="mb-4 text-sm">
+              Within10km, ranked by distance, pickup hours, preferences and
+              remaining capacity. Review safety yourself.
+            </p>
+            <Status query={suggestedFood}>
+              {suggestedFood.data?.items?.length ? (
+                <div className="grid gap-5 md:grid-cols-3">
+                  {suggestedFood.data.items.map((listing) => (
+                    <div key={listing._id}>
+                      <ListingCard listing={listing} />
+                      <p className="mt-2 text-sm">
+                        Match {listing.match.score}/100 ·{' '}
+                        {listing.match.explanation}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty>
+                  No available listings fit your preferences, hours and capacity
+                  nearby.
+                </Empty>
+              )}
+            </Status>
+          </section>
         )}
         {user.role === 'restaurant' && (
           <Link className="button" to="/listings/new">

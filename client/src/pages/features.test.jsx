@@ -316,6 +316,25 @@ it('handles claim handover actions, cancellation, rating and notification read',
   fireEvent.click(screen.getByText('Next page'));
   fireEvent.click(screen.getByText('Previous page'));
 });
+it('shows NGO-ranked food and allows restaurant forecast category selection', async () => {
+  dataOverrides['/ai/recommended-listings'] = {
+    items: [
+      {
+        ...food,
+        match: { score: 85, explanation: 'Fits capacity and hours.' },
+      },
+    ],
+  };
+  view(<Dashboard />);
+  expect(await screen.findByText(/Match 85/)).toBeTruthy();
+  cleanup();
+  view(<Dashboard />);
+  useAuth.setState({ user: { ...user, role: 'restaurant' } });
+  fireEvent.change(await screen.findByLabelText('Forecast category'), {
+    target: { value: 'produce' },
+  });
+  expect(screen.getByLabelText('Forecast category').value).toBe('produce');
+});
 it('handles NGO cancellation and error from an action', async () => {
   dataOverrides['/claims/mine'] = {
     items: [

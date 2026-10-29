@@ -55,7 +55,7 @@ describe('OpenAPI reference', () => {
     }
   });
   it('documents strict payloads, all claim actions, privacy and admin routes', () => {
-    expect(Object.keys(openapi.paths)).toHaveLength(40);
+    expect(Object.keys(openapi.paths)).toHaveLength(41);
     expect(openapi.paths['/listings/{id}'].delete).toBeTruthy();
     for (const action of [
       'approve',

@@ -8,7 +8,7 @@ import { Feedback } from '../models/Feedback.js';
 import { Claim } from '../models/Claim.js';
 import { FoodListing } from '../models/FoodListing.js';
 import { Notification } from '../models/Notification.js';
-import { rankMatches } from '../ai/match.js';
+import { rankMatches, scoreMatch } from '../ai/match.js';
 export async function recommendations(
   listing,
   { radius = 10000, limit = 10 } = {},
@@ -152,4 +152,77 @@ export async function notifyMatches(listingId) {
     );
   }
   return count;
+}
+
+// Rank nearby food for one NGO using the same transparent fit/capacity signals.
+export async function recommendedListings(ngo, { page = 1, limit = 20 } = {}) {
+  const now = new Date();
+  const candidates = await FoodListing.aggregate([
+    {
+      $geoNear: {
+        near: ngo.location,
+        distanceField: 'distanceMeters',
+        spherical: true,
+        maxDistance: 10000,
+        query: {
+          status: 'available',
+          bestBefore: { $gt: now },
+          'pickupWindow.end': { $gt: now },
+        },
+      },
+    },
+    { $limit: 200 },
+    { $project: { reservedBy: 0, activeClaim: 0, notifiedOrgs: 0 } },
+  ]);
+  const allocated = await Claim.aggregate([
+    {
+      $match: {
+        ngo: ngo._id,
+        createdAt: { $gte: new Date(now.getTime() - 48 * 3600000) },
+        status: { $in: ['requested', 'approved', 'picked_up'] },
+      },
+    },
+    {
+      $lookup: {
+        from: 'foodlistings',
+        localField: 'listing',
+        foreignField: '_id',
+        as: 'food',
+      },
+    },
+    { $unwind: '$food' },
+    { $project: { createdAt: 1, servings: '$food.servings' } },
+  ]);
+  const day = (date) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: ngo.timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  const claimedToday = allocated
+    .filter((x) => day(x.createdAt) === day(now))
+    .reduce((sum, x) => sum + x.servings, 0);
+  const ranked = candidates
+    .map((listing) => ({
+      ...listing,
+      match: scoreMatch(
+        listing,
+        { ...ngo, claimedToday },
+        { distanceMeters: listing.distanceMeters, now },
+      ),
+    }))
+    .filter((x) => x.match.eligible)
+    .sort(
+      (a, b) =>
+        b.match.score - a.match.score || a.distanceMeters - b.distanceMeters,
+    );
+  return {
+    items: ranked.slice((page - 1) * limit, page * limit),
+    page,
+    limit,
+    total: ranked.length,
+    candidateLimit: 200,
+    radiusKm: 10,
+  };
 }

@@ -208,6 +208,11 @@ add(
   '/ai/recommendations/{listingId}',
   'Owner/admin ranked nearby NGO score breakdown',
 );
+add('get', '/ai/recommended-listings', 'NGO personalized nearby food ranking', {
+  query: pagination,
+  description:
+    '10km/200candidate bound; scores pickup hours, category/diet, distance and daily allocated capacity. Works without Claude.',
+});
 for (const role of ['public', 'restaurant', 'ngo', 'admin'])
   add('get', '/analytics/' + role, role + ' measured impact/analytics', {
     publicRoute: role === 'public',
