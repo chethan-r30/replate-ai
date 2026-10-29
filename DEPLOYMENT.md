@@ -4,7 +4,7 @@ Verified2026-10-29: frontend https://replate-ai-sigma.vercel.app/ ; API https://
 
 ## Architecture and current hosting limits
 
-Frontend: Vercel, repository root, Vite build output client/dist. API: long-running Node20 Express/Socket.IO service on Render. Data: isolated MongoDB Atlas demo database with transactions. Images: Cloudinary. Email: SMTP.
+Frontend: Vercel, repository root, Vite build output client/dist. API: long-running Node20 Express/Socket.IO service on Render. Data: isolated MongoDB Atlas demo database with transactions. Images: bounded existing MongoDB storage (portfolio scope). Email: SMTP code retained, delivery unconfigured.
 
 Current vendor documentation checked2026-10-28:
 
@@ -35,7 +35,7 @@ Required: NODE_ENV=production, PORT=10000, CLIENT_URL=the exact final HTTPS Verc
 
 JWT secrets must be independent random values of at least32characters. Render generateValue can generate them directly. scripts/generate-secrets.js is a local option; do not put its output in terminal transcripts shared with others.
 
-Optional integrations: ANTHROPIC_API_KEY, ANTHROPIC_MODEL=claude-sonnet-4-6, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, REDIS_URL. Missing Claude uses manual/numeric/rule-based fallback; missing Cloudinary returns unavailable, missing SMTP does not deliver verification/reset mail. Real signup cannot be certified without working SMTP.
+Optional integrations: ANTHROPIC_API_KEY, ANTHROPIC_MODEL=claude-sonnet-4-6, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, REDIS_URL. Missing Claude uses manual/numeric/rule-based fallback; missing SMTP does not deliver verification/reset mail. Real signup cannot be certified without working SMTP.
 
 JWT_ACCESS_EXPIRES=15m, JWT_REFRESH_EXPIRES=7d, RATE_LIMIT_WINDOW_MS=900000, RATE_LIMIT_MAX=100, AI_RATE_LIMIT_PER_HOUR=20 may use validated defaults. GOOGLE_CLIENT_ID/SECRET are placeholders only: optional OAuth is not implemented. COOKIE_DOMAIN is not used to widen host-only cookies.
 
@@ -119,4 +119,6 @@ Official sources checked2026-10-29: https://console.groq.com/settings/billing/pl
 
 The backend adapter uses Groq's OpenAI-compatible chat endpoint, with capped completion tokens,10second timeout, strict existing Zod output validation and human food-safety confirmation. Missing/invalid/quota/network failures preserve current safe fallbacks. No configured live success is claimed until the user's key and Free-plan evidence are verified.
 
-Optional free-demo HTTPS email: set EMAIL_PROVIDER=brevo, BREVO_API_KEY privately, and BREVO_SENDER_EMAIL to the verified sender. Uses plaintext transactional HTTPS API for signup, reset and notifications; no SMTP-port dependency, no paid-provider fallback. Verify account is Free, no card/add-ons, and actual mailbox receipt before acceptance. Free limit300/day can queue excess; delayed action links remain subject to server expiry and single-use checks. A free-mailbox sender is rewritten to a provider-owned transactional domain as a temporary deliverability stopgap, not a permanent production sender solution. Sources: https://help.brevo.com/hc/en-us/articles/208580669-FAQs-What-are-the-limits-of-the-Free-plan and https://help.brevo.com/hc/en-us/articles/14925263522578-Comply-with-Gmail-Yahoo-and-Microsoft-s-requirements-for-email-senders . Default remains smtp for existing installations.
+## Current portfolio scope update,2026-10-29
+
+The user clarified this is a resume project, not a real-user food service, and rejected more provider setups. Cloudinary is no longer needed by upload routes. Existing-database image storage uses50MiB global/10MiB per-owner caps,1000/20image counts, strict input decoding and two concurrent upload slots. No paid capacity or auto-expansion was enabled. Historical unconfigured-provider notes above describe earlier checkpoints. Groq Free is connected; signup/reset mail remains unconfigured without changing authentication rules. Use seeded demo accounts and synthetic data only.

@@ -71,3 +71,7 @@ export async function readProof(path) {
     throw new Error('Could not open proof. Please sign in again or retry.');
   return response.blob();
 }
+
+export async function removeUpload(path) {
+  return api(`/uploads/${path.split('/').pop()}`, { method: 'DELETE' });
+}

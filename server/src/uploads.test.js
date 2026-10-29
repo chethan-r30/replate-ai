@@ -1,25 +1,15 @@
-import { beforeAll, afterAll, afterEach, it, expect, vi } from 'vitest';
+import { beforeAll, afterAll, beforeEach, it, expect } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
+import sharp from 'sharp';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-const { uploadStream, originUrl } = vi.hoisted(() => ({
-  uploadStream: vi.fn(),
-  originUrl: vi.fn(),
-}));
-vi.mock('cloudinary', () => ({
-  v2: {
-    config: vi.fn(),
-    uploader: { upload_stream: uploadStream },
-    url: originUrl,
-  },
-}));
 import { createApp } from './app.js';
 import { parseEnv } from './config/env.js';
 import { User } from './models/User.js';
-import { Organization } from './models/Organization.js';
-import { ProofUpload } from './models/ProofUpload.js';
+import { ProofUpload, UploadBudget } from './models/ProofUpload.js';
 import { signAccess } from './lib/tokens.js';
-let mongo, owner, stranger, admin;
+import { TOTAL_UPLOAD_BYTES } from './routes/uploads.js';
+let mongo, owner, stranger, admin, png;
 const config = parseEnv({
   NODE_ENV: 'test',
   CLIENT_URL: 'http://localhost:5173',
@@ -27,16 +17,14 @@ const config = parseEnv({
   JWT_ACCESS_SECRET: 'a'.repeat(48),
   JWT_REFRESH_SECRET: 'b'.repeat(48),
   RATE_LIMIT_MAX: 10000,
-  CLOUDINARY_CLOUD_NAME: 'synthetic',
-  CLOUDINARY_API_KEY: 'synthetic-key',
-  CLOUDINARY_API_SECRET: 'synthetic-secret',
 });
 const app = createApp(config);
 const auth = (u) => `Bearer ${signAccess(u, config)}`;
-const png = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aPioAAAAASUVORK5CYII=',
-  'base64',
-);
+const upload = (user, path = '/proof', bytes = png) =>
+  request(app)
+    .post('/api/v1/uploads' + path)
+    .set('Authorization', auth(user))
+    .attach('file', bytes, 'synthetic.png');
 beforeAll(async () => {
   mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(mongo.getUri());
@@ -51,45 +39,53 @@ beforeAll(async () => {
   owner = await make('owner@test.invalid', 'restaurant');
   stranger = await make('other@test.invalid', 'ngo');
   admin = await make('admin@test.invalid', 'admin');
+  png = await sharp({
+    create: { width: 80, height: 50, channels: 3, background: '#aabbcc' },
+  })
+    .png()
+    .toBuffer();
 });
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.clearAllMocks();
+beforeEach(async () => {
+  await ProofUpload.deleteMany({});
+  await UploadBudget.deleteMany({});
 });
 afterAll(async () => {
   await mongoose.disconnect();
   await mongo.stop();
 });
-it('separates public photos from authenticated proof and never returns proof origin', async () => {
-  uploadStream.mockImplementation((_options, done) => ({
-    end: () =>
-      done(null, {
-        public_id: 'replate-proof/random',
-        secure_url: 'https://res.cloudinary.com/private-secret',
-      }),
-  }));
-  const result = await request(app)
-    .post('/api/v1/uploads/proof')
-    .set('Authorization', auth(owner))
-    .attach('file', png, 'proof.png');
-  expect(result.status).toBe(201);
-  expect(result.body.data.url).toMatch(/^\/uploads\/proof\/[a-f0-9]{24}$/);
-  expect(JSON.stringify(result.body)).not.toContain('cloudinary');
-  expect(uploadStream.mock.calls[0][0]).toMatchObject({
-    type: 'authenticated',
-    format: 'webp',
-    folder: 'replate-proof',
-  });
-  const record = await ProofUpload.findOne({ owner: owner._id });
-  expect(record.publicId).toBe('replate-proof/random');
-  const photo = await request(app)
-    .post('/api/v1/uploads')
-    .set('Authorization', auth(owner))
-    .attach('file', png, 'food.png');
+it('stores reencoded bytes in existing database; proof private and public photos explicit', async () => {
+  const proof = await upload(owner);
+  expect(proof.status).toBe(201);
+  expect(proof.body.data.url).toMatch(/^\/uploads\/proof\/[a-f0-9]{24}$/);
+  const record = await ProofUpload.findOne({ owner: owner._id }).select(
+    '+bytes',
+  );
+  expect((await sharp(record.bytes).metadata()).format).toBe('webp');
+  expect(record.size).toBe(record.bytes.length);
+  const path = '/api/v1' + proof.body.data.url;
+  expect((await request(app).get(path)).status).toBe(401);
+  expect(
+    (await request(app).get(path).set('Authorization', auth(stranger))).status,
+  ).toBe(404);
+  for (const user of [owner, admin]) {
+    const r = await request(app).get(path).set('Authorization', auth(user));
+    expect(r.status).toBe(200);
+    expect(r.headers['cache-control']).toBe('private, no-store');
+    expect(r.headers['content-type']).toContain('image/webp');
+  }
+  const photo = await upload(owner, '/');
   expect(photo.status).toBe(201);
-  expect(uploadStream.mock.calls[1][0].type).toBeUndefined();
+  const publicPath = new URL(photo.body.data.url).pathname;
+  expect((await request(app).get(publicPath)).status).toBe(200);
+  expect(
+    (
+      await request(app)
+        .get(publicPath.replace('/photo/', '/proof/'))
+        .set('Authorization', auth(owner))
+    ).status,
+  ).toBe(404);
 });
-it('rejects unsigned, unauthorized role, fake MIME and oversize uploads before storage', async () => {
+it('rejects noauth/admin/fakebytes/oversize/broken decoding before storing', async () => {
   expect(
     (
       await request(app)
@@ -97,81 +93,64 @@ it('rejects unsigned, unauthorized role, fake MIME and oversize uploads before s
         .attach('file', png, 'proof.png')
     ).status,
   ).toBe(401);
+  expect((await upload(admin)).status).toBe(403);
   expect(
-    (
-      await request(app)
-        .post('/api/v1/uploads/proof')
-        .set('Authorization', auth(admin))
-        .attach('file', png, 'proof.png')
-    ).status,
-  ).toBe(403);
-  expect(
-    (
-      await request(app)
-        .post('/api/v1/uploads/proof')
-        .set('Authorization', auth(owner))
-        .attach('file', Buffer.from('<svg>bad</svg>'), {
-          filename: 'fake.png',
-          contentType: 'image/png',
-        })
-    ).status,
+    (await upload(owner, '/proof', Buffer.from('<svg>bad</svg>'))).status,
   ).toBe(400);
   expect(
+    (await upload(owner, '/proof', Buffer.alloc(5 * 1024 * 1024 + 1))).status,
+  ).toBe(413);
+  expect((await upload(owner, '/proof', png.subarray(0, 45))).status).toBe(400);
+  expect(await ProofUpload.countDocuments()).toBe(0);
+});
+it('enforces atomic global quota during concurrent uploads and owner removal releases bytes', async () => {
+  const size = (
+    await sharp(png)
+      .rotate()
+      .resize({
+        width: 1600,
+        height: 1600,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 78 })
+      .toBuffer()
+  ).length;
+  await UploadBudget.create({ _id: 'global', used: TOTAL_UPLOAD_BYTES - size });
+  const results = await Promise.all([upload(owner), upload(stranger)]);
+  expect(results.map((x) => x.status).sort()).toEqual([201, 409]);
+  expect(await ProofUpload.countDocuments()).toBe(1);
+  const record = await ProofUpload.findOne();
+  const correct = String(record.owner) === String(owner._id) ? owner : stranger;
+  const wrong = correct === owner ? stranger : owner;
+  expect(
     (
       await request(app)
-        .post('/api/v1/uploads/proof')
-        .set('Authorization', auth(owner))
-        .attach('file', Buffer.alloc(5 * 1024 * 1024 + 1), 'large.png')
+        .delete(`/api/v1/uploads/${record._id}`)
+        .set('Authorization', auth(wrong))
     ).status,
-  ).toBe(413);
-  expect(uploadStream).not.toHaveBeenCalled();
-});
-it('owner and admin can read proof bytes; strangers and revoked records cannot, and origin is not disclosed', async () => {
-  const record = await ProofUpload.create({
-    owner: owner._id,
-    publicId: 'replate-proof/read-test',
-  });
-  originUrl.mockReturnValue(
-    'https://res.cloudinary.com/synthetic/image/authenticated/s--signed--/proof.webp',
+  ).toBe(404);
+  expect(
+    (
+      await request(app)
+        .delete(`/api/v1/uploads/${record._id}`)
+        .set('Authorization', auth(correct))
+    ).status,
+  ).toBe(200);
+  expect((await UploadBudget.findById('global')).used).toBe(
+    TOTAL_UPLOAD_BYTES - size,
   );
-  const fetcher = vi
-    .fn()
-    .mockImplementation(async () => new Response(png, { status: 200 }));
-  vi.stubGlobal('fetch', fetcher);
-  const path = `/api/v1/uploads/proof/${record._id}`;
-  expect((await request(app).get(path)).status).toBe(401);
-  expect(
-    (await request(app).get(path).set('Authorization', auth(stranger))).status,
-  ).toBe(404);
-  expect(fetcher).not.toHaveBeenCalled();
-  for (const user of [owner, admin]) {
-    const r = await request(app).get(path).set('Authorization', auth(user));
-    expect(r.status).toBe(200);
-    expect(r.headers['cache-control']).toBe('private, no-store');
-    expect(r.headers['content-type']).toContain('image/webp');
-    expect(r.headers.location).toBeUndefined();
-  }
-  expect(originUrl.mock.calls[0][1]).toMatchObject({
-    type: 'authenticated',
-    sign_url: true,
-  });
-  await ProofUpload.updateOne({ _id: record._id }, { $set: { revoked: true } });
-  expect(
-    (await request(app).get(path).set('Authorization', auth(owner))).status,
-  ).toBe(404);
 });
-it('cannot bind another owners private proof and allows own proof for admin review', async () => {
-  const record = await ProofUpload.create({
-    owner: owner._id,
-    publicId: 'replate-proof/bind',
-  });
+it('cannot bind another owners proof or a public photo as private proof', async () => {
+  const proof = await upload(owner);
+  const photo = await upload(owner, '/');
   const data = {
     name: 'Test kitchen',
     registrationNo: 'REG123',
     timezone: 'Asia/Kolkata',
     address: '123 Example Street',
     location: { type: 'Point', coordinates: [77, 12] },
-    verificationDocs: [`/uploads/proof/${record._id}`],
+    verificationDocs: [proof.body.data.url],
   };
   expect(
     (
@@ -181,12 +160,39 @@ it('cannot bind another owners private proof and allows own proof for admin revi
         .send(data)
     ).status,
   ).toBe(400);
-  const own = await request(app)
-    .post('/api/v1/organizations')
-    .set('Authorization', auth(owner))
-    .send(data);
-  expect(own.status).toBe(201);
+  const photoId = new URL(photo.body.data.url).pathname.split('/').pop();
   expect(
-    (await Organization.findById(own.body.data._id)).verificationStatus,
-  ).toBe('pending');
+    (
+      await request(app)
+        .post('/api/v1/organizations')
+        .set('Authorization', auth(owner))
+        .send({ ...data, verificationDocs: [`/uploads/proof/${photoId}`] })
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await request(app)
+        .post('/api/v1/organizations')
+        .set('Authorization', auth(owner))
+        .send(data)
+    ).status,
+  ).toBe(201);
+});
+
+it('enforces per-owner object quota and foreign-owner deletion boundaries', async () => {
+  const first = await upload(owner);
+  const id = first.body.data.url.split('/').pop();
+  expect(
+    (
+      await request(app)
+        .delete('/api/v1/uploads/' + id)
+        .set('Authorization', auth(stranger))
+    ).status,
+  ).toBe(404);
+  await UploadBudget.updateOne(
+    { _id: `owner:${owner._id}` },
+    { $set: { count: 20 } },
+  );
+  expect((await upload(owner)).status).toBe(409);
+  expect(await ProofUpload.countDocuments()).toBe(1);
 });

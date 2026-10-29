@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, uploadImage } from '../lib/api.js';
+import { api, uploadImage, removeUpload } from '../lib/api.js';
 import { Heading, Status } from '../components/States.jsx';
 const schema = z.object({
   name: z.string().min(2),
@@ -41,6 +41,7 @@ export default function OrganizationPage() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [newProof, setNewProof] = useState('');
   const {
     register,
     handleSubmit,
@@ -104,6 +105,7 @@ export default function OrganizationPage() {
         throw new Error('Choose a JPEG, PNG or WebP proof image under 5MB');
       const data = await uploadImage(file, '/uploads/proof');
       setValue('proof', data.url, { shouldValidate: true });
+      setNewProof(data.url);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -199,6 +201,23 @@ export default function OrganizationPage() {
             JPEG, PNG or WebP under 5MB. Uploaded images are readable only by
             you and admins. Do not include unnecessary personal information.
           </p>
+          {newProof && (
+            <button
+              type="button"
+              className="mt-2 underline"
+              onClick={async () => {
+                try {
+                  await removeUpload(newProof);
+                  setValue('proof', '');
+                  setNewProof('');
+                } catch (e) {
+                  setError(e.message);
+                }
+              }}
+            >
+              Remove newly uploaded proof
+            </button>
+          )}
           {uploading && <p role="status">Uploading proof...</p>}
           {watch('proof')?.startsWith('/uploads/proof/') ? (
             <ProofLink url={watch('proof')} />

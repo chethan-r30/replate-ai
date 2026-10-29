@@ -72,6 +72,7 @@ async function validateProofOwnership(docs, owner) {
     const record = await ProofUpload.exists({
       _id: doc.split('/').pop(),
       owner,
+      kind: 'proof',
       revoked: false,
     });
     if (!record) throw new AppError(400, 'Upload your own verification proof');

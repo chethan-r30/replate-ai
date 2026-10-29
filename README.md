@@ -10,7 +10,7 @@ Share surplus food between restaurants and NGOs, with reviewed AI assistance, ma
 
 Phases0-9 are implemented and verified. Phase10 documents the final checks below. The live restaurant-post -> NGO-request -> restaurant-approval -> code-confirmed-pickup flow passed2026-10-29. All food, organizations, addresses and impact are synthetic. Nothing is available for actual collection.
 
-This is the accepted **free demo, not a production-ready public food service**. The API can take about a minute to wake; reminders pause while it sleeps. Groq Free is connected for reviewed text/image drafts and forecast prose; quota/provider failures retain manual/numeric fallback. Cloudinary storage and signup/reset email are still awaiting configured live verification. Manual entry and rule-based matching work. Brevo HTTPS mail support is opt-in; its no-domain sender is a temporary demo option, not permanent production mail. Do not enter personal data or use personal passwords.
+This is the accepted **free demo, not a production-ready public food service**. The API can take about a minute to wake; reminders pause while it sleeps. Groq Free is connected for reviewed text/image drafts and forecast prose; quota/provider failures retain manual/numeric fallback. Photos and private verification images are stored in the existing database with strict demo quotas, no additional provider. Signup/reset email is unconfigured; use the seeded demo accounts. Manual entry and rule-based matching work. Do not enter personal data or use personal passwords.
 
 Demo identities: restaurant1@demo.replate.invalid through restaurant3; ngo1@demo.replate.invalid through ngo3. The owner has the shared demo-only password in the private vault item `ReplateAI synthetic demo accounts`. Do not publish it or the admin credential. Seeded pickup windows expire naturally; past demo food is not kept artificially available. New synthetic listings can be posted to repeat the workflow.
 
@@ -31,8 +31,8 @@ flowchart LR
   Browser -->|authenticated Socket.IO| API
   API --> DB[(Atlas MongoDB replica set)]
   API -. optional .-> Claude[Anthropic]
-  API -. optional .-> Images[Cloudinary]
-  API -. optional .-> Email[SMTP or Brevo HTTPS]
+  API --> Images[Bounded MongoDB image storage]
+  API -. optional .-> Email[SMTP]
 ```
 
 JavaScript ES2022/JSX throughout. React18, Vite, Tailwind, React Router6, TanStack Query, Zustand, React Hook Form/Zod, Leaflet/OSM, Recharts, Socket.IO and PWA shell. Node20, Express, Mongoose, Zod, pino, Helmet, cron and Vitest/Supertest/Playwright.
@@ -58,22 +58,20 @@ For persistent startup, fill MongoDB/JWT keys and run `npm start -w server`. Inv
 
 Never commit real values. Full key list: [server/.env.example](server/.env.example), [client/.env.example](client/.env.example).
 
-| Keys                                                             | Purpose                                                       |
-| ---------------------------------------------------------------- | ------------------------------------------------------------- |
-| NODE_ENV, PORT, CLIENT_URL                                       | Runtime and exact allowed browser origin; HTTPS in production |
-| MONGODB_URI                                                      | Replica-set database; required outside disposable sandbox     |
-| JWT_ACCESS_SECRET, JWT_REFRESH_SECRET                            | Separate random32+character secrets                           |
-| JWT_ACCESS_EXPIRES, JWT_REFRESH_EXPIRES                          | Fixed15m and7d                                                |
-| COOKIE_DOMAIN                                                    | Legacy placeholder; refresh cookie stays host-only            |
-| ANTHROPIC_API_KEY, ANTHROPIC_MODEL                               | Optional reviewed parser/prose;10s timeout and fallback       |
-| CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET | Optional image upload; unavailable without keys               |
-| EMAIL_PROVIDER, BREVO_API_KEY, BREVO_SENDER_EMAIL                | Optional Brevo HTTPS transactional mail, default smtp         |
-| SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM           | Verification/reset/notification email; no false delivery      |
-| RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX, AI_RATE_LIMIT_PER_HOUR     | Global and AI limits; login also separately limited           |
-| REDIS_URL                                                        | Optional shared cache                                         |
-| GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET                           | Reserved placeholders; optional OAuth not implemented         |
-| VITE_API_URL, VITE_SOCKET_URL                                    | Public API/socket locations; never secrets                    |
-| VITE_DEMO_MODE                                                   | Visible synthetic-demo warning                                |
+| Keys                                                         | Purpose                                                       |
+| ------------------------------------------------------------ | ------------------------------------------------------------- |
+| NODE_ENV, PORT, CLIENT_URL                                   | Runtime and exact allowed browser origin; HTTPS in production |
+| MONGODB_URI                                                  | Replica-set database; required outside disposable sandbox     |
+| JWT_ACCESS_SECRET, JWT_REFRESH_SECRET                        | Separate random32+character secrets                           |
+| JWT_ACCESS_EXPIRES, JWT_REFRESH_EXPIRES                      | Fixed15m and7d                                                |
+| COOKIE_DOMAIN                                                | Legacy placeholder; refresh cookie stays host-only            |
+| ANTHROPIC_API_KEY, ANTHROPIC_MODEL                           | Optional reviewed parser/prose;10s timeout and fallback       |
+| SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM       | Verification/reset/notification email; no false delivery      |
+| RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX, AI_RATE_LIMIT_PER_HOUR | Global and AI limits; login also separately limited           |
+| REDIS_URL                                                    | Optional shared cache                                         |
+| GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET                       | Reserved placeholders; optional OAuth not implemented         |
+| VITE_API_URL, VITE_SOCKET_URL                                | Public API/socket locations; never secrets                    |
+| VITE_DEMO_MODE                                               | Visible synthetic-demo warning                                |
 
 `scripts/generate-secrets.js` prints random JWT values locally. Keep its output private. Deployment-only seed settings: MONGODB_URI, SEED_PASSWORD and explicit SEED_ALLOW_REMOTE=true for an intended remote demo. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
@@ -103,6 +101,10 @@ Inspected acceptance screenshots accompanied the private handoff; replace placeh
 
 ## Roadmap and limits
 
-Configure real external services and validate delivery/uploads, choose an approved always-on scheduler/hosting arrangement, establish backup/retention/food-safety operations, load-test the chosen production topology, and complete an independent security review before real use. Optional OAuth and Sentry are not implemented. PWA offline shell does not permit offline claims. Shared free hosting is not certified for200concurrent users; the load target is measured in disposable CI.
+Configure and validate real email delivery, choose an approved always-on scheduler/hosting arrangement, establish backup/retention/food-safety operations, load-test the chosen production topology, and complete an independent security review before real use. Optional OAuth and Sentry are not implemented. PWA offline shell does not permit offline claims. Shared free hosting is not certified for200concurrent users; the load target is measured in disposable CI.
 
 Work through feature PRs into develop and checked release PRs into protected main. See [CONTRIBUTING.md](CONTRIBUTING.md). MIT license: [LICENSE](LICENSE).
+
+### Portfolio image storage
+
+JPEG/PNG/WebP only, 5 MiB input and 16 million decoded pixels. Images are rotated, metadata stripped, resized to at most1600px, and WebP encoded to at most1MiB. Atomic caps: 50MiB/1000images globally, 10MiB/20images per account. At most two uploads process concurrently per API instance. Listing photos are public; proof images require owner/admin authorization and no-store delivery. Owners can delete a newly uploaded image in the form or call DELETE /api/v1/uploads/{id}; account erasure removes bytes and releases quota. No automatic deletion of verification evidence. Database backups, if enabled, have a separate retention policy. Small database image storage is a portfolio tradeoff, not a production media platform.

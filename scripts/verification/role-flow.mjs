@@ -12,6 +12,7 @@ const root = new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 const { createApp } = await import(root + '/server/src/app.js');
 const { parseEnv } = await import(root + '/server/src/config/env.js');
 const { User } = await import(root + '/server/src/models/User.js');
+const { default: sharp } = await import('sharp');
 
 const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
 await mongoose.connect(mongo.getUri());
@@ -24,6 +25,11 @@ const config = parseEnv({
   RATE_LIMIT_MAX: 10000,
 });
 await mkdir(root + '/test-results', { recursive: true });
+await sharp({
+  create: { width: 640, height: 280, channels: 3, background: '#e5efe8' },
+})
+  .png()
+  .toFile(root + '/test-results/upload-synthetic.png');
 let server, browser, web;
 try {
   const passwordHash = await bcrypt.hash('DemoVisual123!', 12);
@@ -181,31 +187,37 @@ try {
       }),
     });
     if (role === 'restaurant') {
-      // Controlled synthetic proof preview exercises the authenticated byte fetch UI.
-      const { ProofUpload } = await import(
-        root + '/server/src/models/ProofUpload.js'
-      );
+      // Real local API upload, byte decoding and database storage, no provider mocks.
+      await login('restaurant@demo.example');
+      await page
+        .getByRole('link', { name: 'Organization & preferences', exact: true })
+        .click();
+      await page
+        .getByLabel('Upload verification proof image')
+        .setInputFiles(root + '/test-results/upload-synthetic.png');
+      await page
+        .getByRole('button', { name: 'View private proof', exact: true })
+        .waitFor();
       const { Organization } = await import(
         root + '/server/src/models/Organization.js'
+      );
+      const { ProofUpload } = await import(
+        root + '/server/src/models/ProofUpload.js'
       );
       const restaurantUser = await User.findOne({
         email: 'restaurant@demo.example',
       });
-      const proof = await ProofUpload.create({
+      const proof = await ProofUpload.findOne({
         owner: restaurantUser._id,
-        publicId: 'synthetic-ui-only',
+        kind: 'proof',
       });
+      assert(proof, 'Real proof upload must persist in database');
       await Organization.updateOne(
         { owner: restaurantUser._id },
         { $set: { verificationDocs: [`/uploads/proof/${proof._id}`] } },
       );
-      await page.route('**/uploads/proof/*', (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: 'image/svg+xml',
-          body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="280"><rect width="640" height="280" fill="#e5efe8"/><text x="30" y="120" font-size="24">SYNTHETIC PROOF - UI TEST ONLY</text></svg>',
-        }),
-      );
+      await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+      await login('admin@demo.example');
       await page.reload();
       await card
         .getByRole('button', { name: 'View private proof', exact: true })
@@ -243,6 +255,24 @@ try {
   }
   await login('restaurant@demo.example');
   await page.getByRole('link', { name: 'Post surplus', exact: true }).click();
+  await page
+    .getByLabel('Upload listing photo (public)')
+    .setInputFiles(root + '/test-results/upload-synthetic.png');
+  await page.getByAltText('Uploaded listing photo preview').waitFor();
+  await page.waitForFunction(() => {
+    const i = document.querySelector(
+      'img[alt="Uploaded listing photo preview"]',
+    );
+    return i?.complete && i.naturalWidth > 0;
+  });
+  await page.screenshot({
+    path:
+      root +
+      '/test-results/public-photo-' +
+      (process.env.MOBILE ? 'mobile' : 'desktop') +
+      '.png',
+    fullPage: true,
+  });
   await page.getByLabel('Title', { exact: true }).fill('Smoke test bread');
   await page
     .getByLabel('Description', { exact: true })
