@@ -13,9 +13,28 @@ import { Claim } from '../../server/src/models/Claim.js';
 import { signAccess } from '../../server/src/lib/tokens.js';
 const connections = Number(process.env.LOAD_CONNECTIONS || 200);
 const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
+// Report actual disposable storage/durability settings, never alter them to pass.
+
 let server;
 try {
   await mongoose.connect(mongo.getUri(), { maxPoolSize: 250, minPoolSize: 20 });
+  if (process.env.PROFILE_DB === '1') {
+    const admin = mongoose.connection.db.admin();
+    const [status, options, defaults] = await Promise.all([
+      admin.command({ serverStatus: 1 }),
+      admin.command({ getCmdLineOpts: 1 }),
+      admin.command({ getDefaultRWConcern: 1 }),
+    ]);
+    console.error(
+      'Disposable storage diagnostic',
+      JSON.stringify({
+        engine: status.storageEngine,
+        journaling: options.parsed?.storage?.journal,
+        writeConcern: defaults.defaultWriteConcern || 'server default',
+        filesystem: os.tmpdir(),
+      }),
+    );
+  }
   await Promise.all([
     User.init(),
     Organization.init(),
