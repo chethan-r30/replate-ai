@@ -154,6 +154,9 @@ try {
     await page
       .getByText('Current location selected.', { exact: false })
       .waitFor();
+    await page
+      .getByRole('button', { name: 'Hide location map', exact: true })
+      .click();
     if (role === 'restaurant')
       await page.screenshot({
         path:
