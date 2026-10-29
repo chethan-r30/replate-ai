@@ -50,8 +50,16 @@ export async function api(path, { method = 'GET', body, retry = true } = {}) {
 }
 
 export async function uploadImage(file, path = '/uploads') {
+  if (!file || file.size > 5 * 1024 * 1024)
+    throw new Error('Choose an image under 5 MiB');
+  // Snapshot bytes before multipart transport; selected file backing stores can change.
+  const bytes = await file.arrayBuffer();
   const body = new FormData();
-  body.append('file', file);
+  body.append(
+    'file',
+    new Blob([bytes], { type: file.type }),
+    file.name || 'image',
+  );
   const response = await fetch(`${config.VITE_API_URL}${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getAccessToken()}` },
