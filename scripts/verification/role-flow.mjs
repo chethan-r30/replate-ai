@@ -77,6 +77,28 @@ try {
   await page
     .getByText('Location selected. Check or adjust the map pin.')
     .waitFor();
+  await page.waitForFunction(() => {
+    const tiles = [...document.querySelectorAll('.leaflet-tile')];
+    return (
+      tiles.length > 0 &&
+      tiles.every(
+        (tile) =>
+          tile.complete &&
+          tile.naturalWidth > 0 &&
+          tile.classList.contains('leaflet-tile-loaded') &&
+          Number(getComputedStyle(tile).opacity) >= 0.99,
+      )
+    );
+  });
+  await page
+    .locator('.leaflet-container')
+    .screenshot({
+      path:
+        root +
+        '/test-results/location-map-' +
+        (process.env.MOBILE ? 'mobile' : 'desktop') +
+        '.png',
+    });
   await page.screenshot({
     path:
       root +
