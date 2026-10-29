@@ -244,7 +244,7 @@ for (const name of ['health', 'ready'])
 add('post', '/uploads', 'Restaurant/NGO image upload', {
   created: true,
   description:
-    'Multipart file field; one sniffed JPEG/PNG/WebP, maximum5MB; reencoded by Cloudinary. Missing credentials503.',
+    'Multipart file field; one sniffed JPEG/PNG/WebP, maximum 5 MiB input/16 million pixels; local WebP max 1 MiB, stored in bounded existing database. Returns public photo URL.',
 });
 paths['/uploads'].post.requestBody = {
   required: true,
@@ -259,6 +259,29 @@ paths['/uploads'].post.requestBody = {
     },
   },
 };
+add('post', '/uploads/proof', 'Upload owner-private organization proof image', {
+  created: true,
+  description:
+    'JPEG/PNG/WebP under 5 MiB, reencoded locally and stored in existing database. Returns owner/admin-only API path, never origin URL.',
+});
+paths['/uploads/proof'].post.requestBody = paths['/uploads'].post.requestBody;
+add(
+  'get',
+  '/uploads/proof/{id}',
+  'Read private proof bytes as owner or admin',
+  {
+    description:
+      'Returns image/webp, no-store;404 for unrelated or revoked uploads. No redirects or signed origin URL disclosure.',
+  },
+);
+add('get', '/uploads/photo/{id}', 'Read a public listing photo', {
+  publicRoute: true,
+});
+add(
+  'delete',
+  '/uploads/{id}',
+  'Owner deletes upload and releases storage quota',
+);
 export const openapi = {
   openapi: '3.1.0',
   info: {

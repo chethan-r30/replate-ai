@@ -286,7 +286,7 @@ describe('core domain', () => {
     expect(canTransition('picked_up', 'cancelled')).toBe(false);
     expect(canTransition('requested', 'approved')).toBe(true);
   });
-  it('rejects fake image bytes and uses explicit no-key upload fallback', async () => {
+  it('rejects fake and truncated image bytes before database storage', async () => {
     expect(
       (
         await request(app)
@@ -306,7 +306,7 @@ describe('core domain', () => {
           .set('Authorization', restaurant.auth)
           .attach('file', png, 'food.png')
       ).status,
-    ).toBe(503);
+    ).toBe(400);
   });
   it('rolls back reservation when claim persistence fails', async () => {
     const listing = await post();

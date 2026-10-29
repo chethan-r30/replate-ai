@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, getAccessToken } from '../lib/api.js';
+import { api, uploadImage } from '../lib/api.js';
 import { Heading } from '../components/States.jsx';
 const schema = z.object({
   title: z.string().min(3),
@@ -35,6 +35,8 @@ export default function ListingForm() {
   const [note, setNote] = useState('');
   const [ai, setAi] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState('');
   const [image, setImage] = useState(null);
   const org = useQuery({
     queryKey: ['organization'],
@@ -123,21 +125,16 @@ export default function ListingForm() {
   }
   async function upload(file) {
     if (!file) return;
+    setUploading(true);
     setError('');
     try {
-      const body = new FormData();
-      body.append('file', file);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/uploads`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-        body,
-        credentials: 'include',
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
-      setValue('photo', data.data.url);
+      const data = await uploadImage(file);
+      setValue('photo', data.url);
+      setUploaded(data.url);
     } catch (e) {
       setError(e.message);
+    } finally {
+      setUploading(false);
     }
   }
   async function submit(v) {
@@ -287,13 +284,47 @@ export default function ListingForm() {
           </label>
         ))}
         <label className="text-sm">
-          Upload listing photo
+          Upload listing photo (public)
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
+            disabled={uploading}
             onChange={(e) => upload(e.target.files[0])}
           />
         </label>
+        {uploading && <p role="status">Uploading photo...</p>}
+        {uploaded && (
+          <div className="sm:col-span-2">
+            <img
+              className="max-h-48 rounded"
+              src={uploaded}
+              alt="Uploaded listing photo preview"
+            />
+            <button
+              type="button"
+              className="mt-2 underline"
+              onClick={async () => {
+                try {
+                  await api(
+                    `/uploads/${new URL(uploaded).pathname.split('/').pop()}`,
+                    { method: 'DELETE' },
+                  );
+                  setValue('photo', '');
+                  setUploaded('');
+                } catch (e) {
+                  setError(e.message);
+                }
+              }}
+            >
+              Remove newly uploaded photo
+            </button>
+          </div>
+        )}
+        <p className="text-sm sm:col-span-2">
+          Demo storage: JPEG/PNG/WebP under5MB input, compressed to1MB. Up
+          to20images/10MiB per account. Listing photos are public; do not upload
+          private documents here.
+        </p>
         <label className="flex gap-3 rounded-xl border border-stone-300 p-4 text-sm sm:col-span-2">
           <input type="checkbox" {...register('confirmed')} />I reviewed
           ingredients, allergens, storage, quantity and the safe deadline. AI
@@ -309,7 +340,10 @@ export default function ListingForm() {
             {error}
           </p>
         )}
-        <button disabled={isSubmitting} className="button sm:col-span-2">
+        <button
+          disabled={isSubmitting || uploading}
+          className="button sm:col-span-2"
+        >
           {isSubmitting ? 'Saving...' : 'Review confirmed. Save listing'}
         </button>
       </form>

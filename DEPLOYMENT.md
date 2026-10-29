@@ -4,7 +4,7 @@ Verified2026-10-29: frontend https://replate-ai-sigma.vercel.app/ ; API https://
 
 ## Architecture and current hosting limits
 
-Frontend: Vercel, repository root, Vite build output client/dist. API: long-running Node20 Express/Socket.IO service on Render. Data: isolated MongoDB Atlas demo database with transactions. Images: Cloudinary. Email: SMTP.
+Frontend: Vercel, repository root, Vite build output client/dist. API: long-running Node20 Express/Socket.IO service on Render. Data: isolated MongoDB Atlas demo database with transactions. Images: bounded existing MongoDB storage (portfolio scope). Email: SMTP code retained, delivery unconfigured.
 
 Current vendor documentation checked2026-10-28:
 
@@ -35,7 +35,7 @@ Required: NODE_ENV=production, PORT=10000, CLIENT_URL=the exact final HTTPS Verc
 
 JWT secrets must be independent random values of at least32characters. Render generateValue can generate them directly. scripts/generate-secrets.js is a local option; do not put its output in terminal transcripts shared with others.
 
-Optional integrations: ANTHROPIC_API_KEY, ANTHROPIC_MODEL=claude-sonnet-4-6, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, REDIS_URL. Missing Claude uses manual/numeric/rule-based fallback; missing Cloudinary returns unavailable, missing SMTP does not deliver verification/reset mail. Real signup cannot be certified without working SMTP.
+Optional integrations: ANTHROPIC_API_KEY, ANTHROPIC_MODEL=claude-sonnet-4-6, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, REDIS_URL. Missing Claude uses manual/numeric/rule-based fallback; missing SMTP does not deliver verification/reset mail. Real signup cannot be certified without working SMTP.
 
 JWT_ACCESS_EXPIRES=15m, JWT_REFRESH_EXPIRES=7d, RATE_LIMIT_WINDOW_MS=900000, RATE_LIMIT_MAX=100, AI_RATE_LIMIT_PER_HOUR=20 may use validated defaults. GOOGLE_CLIENT_ID/SECRET are placeholders only: optional OAuth is not implemented. COOKIE_DOMAIN is not used to widen host-only cookies.
 
@@ -118,3 +118,7 @@ User-approved alternative: set AI_PROVIDER=groq, GROQ_API_KEY privately, GROQ_MO
 Official sources checked2026-10-29: https://console.groq.com/settings/billing/plans , https://console.groq.com/docs/billing-faqs , https://console.groq.com/docs/rate-limits , https://console.groq.com/docs/vision , https://console.groq.com/docs/models . Published per-model Free caps currently30requests/minute,1000/day,8000tokens/minute,200000/day for these two models; exact account limits can differ and are organization-wide. An image contributes2048inputtokens for the current vision model. Quota429fails to manual/numbers-only mode, never switches to paid Anthropic or upgrades an account. Existing per-user AI limits are not a guarantee against exhausting this shared quota. Numeric forecasts/matching remain local. This does not connect SMTP/images or change free-host sleep.
 
 The backend adapter uses Groq's OpenAI-compatible chat endpoint, with capped completion tokens,10second timeout, strict existing Zod output validation and human food-safety confirmation. Missing/invalid/quota/network failures preserve current safe fallbacks. No configured live success is claimed until the user's key and Free-plan evidence are verified.
+
+## Current portfolio scope update,2026-10-29
+
+The user clarified this is a resume project, not a real-user food service, and rejected more provider setups. Cloudinary is no longer needed by upload routes. Existing-database image storage uses50MiB global/10MiB per-owner caps,1000/20image counts, strict input decoding and two concurrent upload slots. No paid capacity or auto-expansion was enabled. Historical unconfigured-provider notes above describe earlier checkpoints. Groq Free is connected; signup/reset mail remains unconfigured without changing authentication rules. Use seeded demo accounts and synthetic data only.

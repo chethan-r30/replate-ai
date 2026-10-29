@@ -1,3 +1,4 @@
+import { ProofUpload } from '../models/ProofUpload.js';
 import mongoose from 'mongoose';
 // Organization proof and admin approval are server-side gates, never client flags.
 import { Router } from 'express';
@@ -54,9 +55,29 @@ export const organizationSchema = z
       })
       .strict()
       .default({ categories: [], dietary: [] }),
-    verificationDocs: z.array(z.string().url().max(1000)).min(1).max(5),
+    verificationDocs: z
+      .array(
+        z.union([
+          z.string().url().max(1000),
+          z.string().regex(/^\/uploads\/proof\/[a-f0-9]{24}$/),
+        ]),
+      )
+      .min(1)
+      .max(5),
   })
   .strict();
+async function validateProofOwnership(docs, owner) {
+  for (const doc of docs || []) {
+    if (!doc.startsWith('/uploads/proof/')) continue;
+    const record = await ProofUpload.exists({
+      _id: doc.split('/').pop(),
+      owner,
+      kind: 'proof',
+      revoked: false,
+    });
+    if (!record) throw new AppError(400, 'Upload your own verification proof');
+  }
+}
 export function organizationRoutes(config) {
   const r = Router();
   r.use(requireAuth(config));
@@ -65,6 +86,7 @@ export function organizationRoutes(config) {
     requireRole('restaurant', 'ngo'),
     asyncRoute(async (req, res) => {
       const data = organizationSchema.parse(req.body);
+      await validateProofOwnership(data.verificationDocs, req.user._id);
       const org = await Organization.create({
         ...data,
         owner: req.user._id,
@@ -120,6 +142,7 @@ export function organizationRoutes(config) {
       const data = Object.fromEntries(
         Object.keys(req.body).map((key) => [key, parsed[key]]),
       );
+      await validateProofOwnership(data.verificationDocs, req.user._id);
       if (Object.keys(data).length === 0)
         throw new AppError(400, 'No changes provided');
       const org = await Organization.findOneAndUpdate(

@@ -1,3 +1,4 @@
+import { ProofUpload, UploadBudget } from '../models/ProofUpload.js';
 import { disconnectUser } from './realtime.js';
 import { clearDevInbox } from '../lib/mail.js';
 // Erase account PII while preserving non-identifying food and pickup history.
@@ -83,6 +84,16 @@ export async function deleteAccount(user) {
         { $unset: { comment: 1 } },
       );
     }
+    const assets = await ProofUpload.find({ owner: user._id })
+      .select('size')
+      .lean();
+    const released = assets.reduce((sum, asset) => sum + asset.size, 0);
+    await ProofUpload.deleteMany({ owner: user._id });
+    if (released)
+      await UploadBudget.updateMany(
+        { _id: { $in: ['global', `owner:${user._id}`] } },
+        { $inc: { used: -released, count: -assets.length } },
+      );
     await RefreshToken.deleteMany({ user: user._id });
     await ActionToken.deleteMany({ user: user._id });
     await Notification.deleteMany({ user: user._id });

@@ -1,3 +1,4 @@
+import { ProofUpload, UploadBudget } from './models/ProofUpload.js';
 import { Feedback } from './models/Feedback.js';
 import { beforeAll, afterAll, beforeEach, it, expect, vi } from 'vitest';
 import mongoose from 'mongoose';
@@ -119,11 +120,24 @@ it('erases PII/tokens/notifications, cancels available listings and denies old s
     rating: 4,
     comment: 'Personal details',
   });
+  await ProofUpload.create({
+    owner: user._id,
+    kind: 'proof',
+    bytes: Buffer.from('synthetic'),
+    size: 9,
+  });
+  await UploadBudget.create([
+    { _id: 'global', used: 9, count: 1 },
+    { _id: `owner:${user._id}`, used: 9, count: 1 },
+  ]);
   const r = await request(app)
     .delete('/api/v1/auth/me')
     .set('Authorization', 'Bearer ' + token)
     .send({ password: 'StrongPass123!', confirmation: 'DELETE' });
   expect(r.status).toBe(200);
+  expect(await ProofUpload.countDocuments({ owner: user._id })).toBe(0);
+  expect((await UploadBudget.findById('global')).used).toBe(0);
+  expect((await UploadBudget.findById('global')).count).toBe(0);
   expect(r.headers['set-cookie'][0]).toContain('Expires=Thu, 01 Jan 1970');
   const erased = await User.findById(user._id).select('+passwordHash');
   expect(erased.email).not.toBe(user.email);

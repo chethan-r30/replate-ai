@@ -218,9 +218,9 @@ export default function App() {
             <div className="mx-auto max-w-6xl">
               Demo only. All seeded food and impact data is synthetic, not
               available for pickup. The free API may take about a minute to
-              wake. Reminders pause while it sleeps; signup email and photo
-              uploads need configured services. Use demo accounts, not real
-              personal data.
+              wake. Reminders pause while it sleeps; signup/reset email is
+              unconfigured. Photo uploads use bounded demo database storage. Use
+              demo accounts, not real personal data.
             </div>
           </aside>
         )}
