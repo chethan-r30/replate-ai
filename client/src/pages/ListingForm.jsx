@@ -1,3 +1,4 @@
+import LocationPicker from '../components/LocationPicker.jsx';
 // AI only fills a draft; a human must review every safety field before posting.
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -19,8 +20,8 @@ const schema = z.object({
   bestBefore: z.string().min(1),
   start: z.string().min(1),
   end: z.string().min(1),
-  lat: z.coerce.number().min(-90).max(90),
-  lng: z.coerce.number().min(-180).max(180),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
   photo: z.union([z.string().url(), z.literal('')]),
   confirmed: z.literal(true, {
     error: 'Review and confirm the food details before posting',
@@ -44,6 +45,7 @@ export default function ListingForm() {
     handleSubmit,
     setValue,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
@@ -223,6 +225,23 @@ export default function ListingForm() {
         onSubmit={handleSubmit(submit)}
         className="grid gap-5 sm:grid-cols-2"
       >
+        <LocationPicker
+          label="Pickup location"
+          value={{ lat: watch('lat'), lng: watch('lng') }}
+          onChange={(point) => {
+            setValue('lat', point.lat, { shouldValidate: true });
+            setValue('lng', point.lng, { shouldValidate: true });
+          }}
+          error={errors.lat || errors.lng}
+          saved={
+            org.data
+              ? {
+                  lat: org.data.location.coordinates[1],
+                  lng: org.data.location.coordinates[0],
+                }
+              : null
+          }
+        />
         {[
           ['title', 'Title'],
           ['description', 'Description'],
@@ -233,8 +252,6 @@ export default function ListingForm() {
           ['bestBefore', 'Food deadline'],
           ['start', 'Pickup starts'],
           ['end', 'Pickup ends'],
-          ['lat', 'Latitude'],
-          ['lng', 'Longitude'],
           ['photo', 'Photo URL (optional)'],
         ].map(([name, label]) => (
           <label key={name} className="text-sm font-semibold">
@@ -269,18 +286,6 @@ export default function ListingForm() {
             </select>
           </label>
         ))}
-        <button
-          type="button"
-          className="underline"
-          onClick={() => {
-            if (org.data) {
-              setValue('lat', org.data.location.coordinates[1]);
-              setValue('lng', org.data.location.coordinates[0]);
-            }
-          }}
-        >
-          Use organization coordinates
-        </button>
         <label className="text-sm">
           Upload listing photo
           <input

@@ -159,12 +159,6 @@ it('explores filters, map, empty/error and pagination states', async () => {
   fireEvent.change(screen.getByLabelText('category'), {
     target: { value: 'bakery' },
   });
-  fireEvent.change(screen.getByLabelText('Latitude'), {
-    target: { value: '12.97' },
-  });
-  fireEvent.change(screen.getByLabelText('Longitude'), {
-    target: { value: '77.59' },
-  });
   fireEvent.change(screen.getByLabelText('Radius (km)'), {
     target: { value: 20 },
   });
@@ -235,7 +229,7 @@ it('uses manual AI fallback and requires food confirmation', async () => {
   });
   fireEvent.click(screen.getByText('Suggest listing details'));
   expect(await screen.findByText('No key')).toBeTruthy();
-  fireEvent.click(screen.getByText('Use organization coordinates'));
+  fireEvent.click(screen.getByText('Use organization location'));
   fireEvent.click(
     screen.getByRole('button', { name: 'Review confirmed. Save listing' }),
   );
