@@ -128,40 +128,6 @@ export default function Dashboard() {
             Organization & preferences
           </Link>
         )}
-        {user.role === 'ngo' && org.data && (
-          <section className="mb-10" aria-labelledby="suggested-food-title">
-            <h2
-              id="suggested-food-title"
-              className="mb-4 text-2xl font-semibold"
-            >
-              Recommended for your NGO
-            </h2>
-            <p className="mb-4 text-sm">
-              Within10km, ranked by distance, pickup hours, preferences and
-              remaining capacity. Review safety yourself.
-            </p>
-            <Status query={suggestedFood}>
-              {suggestedFood.data?.items?.length ? (
-                <div className="grid gap-5 md:grid-cols-3">
-                  {suggestedFood.data.items.map((listing) => (
-                    <div key={listing._id}>
-                      <ListingCard listing={listing} />
-                      <p className="mt-2 text-sm">
-                        Match {listing.match.score}/100 ·{' '}
-                        {listing.match.explanation}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <Empty>
-                  No available listings fit your preferences, hours and capacity
-                  nearby.
-                </Empty>
-              )}
-            </Status>
-          </section>
-        )}
         {user.role === 'restaurant' && (
           <Link className="button" to="/listings/new">
             Post surplus
@@ -171,6 +137,37 @@ export default function Dashboard() {
           Explore food
         </Link>
       </div>
+      {user.role === 'ngo' && org.data && (
+        <section className="mb-10" aria-labelledby="suggested-food-title">
+          <h2 id="suggested-food-title" className="mb-4 text-2xl font-semibold">
+            Recommended for your NGO
+          </h2>
+          <p className="mb-4 text-sm">
+            Within10km, ranked by distance, pickup hours, preferences and
+            remaining capacity. Review safety yourself.
+          </p>
+          <Status query={suggestedFood}>
+            {suggestedFood.data?.items?.length ? (
+              <div className="grid gap-5 md:grid-cols-3">
+                {suggestedFood.data.items.map((listing) => (
+                  <div key={listing._id}>
+                    <ListingCard listing={listing} />
+                    <p className="mt-2 text-sm">
+                      Match {listing.match.score}/100 ·{' '}
+                      {listing.match.explanation}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Empty>
+                No available listings fit your preferences, hours and capacity
+                nearby.
+              </Empty>
+            )}
+          </Status>
+        </section>
+      )}
       {['restaurant', 'ngo'].includes(user.role) && !approved && (
         <div className="mb-8 rounded-2xl bg-amber-50 p-5 text-amber-950">
           <h2 className="font-semibold">
