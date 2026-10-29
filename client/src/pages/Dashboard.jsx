@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [feedback, setFeedback] = useState({});
   const [message, setMessage] = useState('');
   const [page, setPage] = useState(1);
+  const [forecastCategory, setForecastCategory] = useState('bakery');
   const org = useQuery({
     queryKey: ['organization', user.id],
     enabled: user.role !== 'admin' && user.role !== 'volunteer',
@@ -45,9 +46,9 @@ export default function Dashboard() {
     queryFn: () => api(`/listings/mine?page=${page}`),
   });
   const forecast = useQuery({
-    queryKey: ['forecast', user.id],
+    queryKey: ['forecast', user.id, forecastCategory],
     enabled: user.role === 'restaurant' && Boolean(org.data),
-    queryFn: () => api('/ai/forecast'),
+    queryFn: () => api(`/ai/forecast?category=${forecastCategory}`),
   });
   const notifications = useQuery({
     queryKey: ['notifications', user.id],
@@ -73,6 +74,12 @@ export default function Dashboard() {
       import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000',
       { auth: { token: getAccessToken() } },
     );
+    // Every connect includes reconnect: persisted state may have changed offline.
+    socket.on('connect', () => {
+      qc.invalidateQueries({ queryKey: ['notifications', user.id] });
+      qc.invalidateQueries({ queryKey: ['claims'] });
+      qc.invalidateQueries({ queryKey: ['my-listings'] });
+    });
     socket.on('notification', () => {
       qc.invalidateQueries({ queryKey: ['notifications', user.id] });
       qc.invalidateQueries({ queryKey: ['claims'] });
@@ -229,6 +236,20 @@ export default function Dashboard() {
               <h2 className="mb-4 mt-10 text-2xl font-semibold">
                 Seven-day surplus forecast
               </h2>
+              <label className="mb-4 block text-sm">
+                Forecast category
+                <select
+                  className="field mt-1"
+                  value={forecastCategory}
+                  onChange={(e) => setForecastCategory(e.target.value)}
+                >
+                  {['cooked', 'bakery', 'produce', 'packaged', 'dairy'].map(
+                    (category) => (
+                      <option key={category}>{category}</option>
+                    ),
+                  )}
+                </select>
+              </label>
               <Status query={forecast}>
                 {forecast.data && (
                   <div className="mb-10 rounded-2xl bg-white p-5 dark:bg-stone-900">

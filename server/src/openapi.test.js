@@ -32,6 +32,28 @@ describe('OpenAPI reference', () => {
       ],
     ).toContain("default-src 'none'");
   });
+  it('matches every documented path and HTTP method to the real Express router', () => {
+    const app = createApp(config);
+    for (const [path, methods] of Object.entries(openapi.paths)) {
+      const sample = path.replace(/\{\w+\}/g, 'a'.repeat(24));
+      for (const method of Object.keys(methods)) {
+        const router = app._router.stack.find(
+          (layer) =>
+            layer.name === 'router' && layer.regexp.test('/api/v1' + sample),
+        );
+        if (['/health', '/ready'].includes(path)) continue;
+        expect(router, path).toBeTruthy();
+        expect(
+          router.handle.stack.some(
+            (layer) =>
+              layer.route?.methods[method] &&
+              layer.match(sample.replace(/^\/[^/]+/, '')),
+          ),
+          method + path,
+        ).toBe(true);
+      }
+    }
+  });
   it('documents strict payloads, all claim actions, privacy and admin routes', () => {
     expect(Object.keys(openapi.paths)).toHaveLength(40);
     expect(openapi.paths['/listings/{id}'].delete).toBeTruthy();

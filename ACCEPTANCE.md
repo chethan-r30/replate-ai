@@ -27,3 +27,5 @@ Checked against the original request, not inferred from a successful deploy. Evi
 ## Non-waived production work
 
 Configured external-service success, reliable always-on reminder execution, backups/retention, real topology capacity and independent food-safety/security operations remain needed before real users. No paid upgrade is authorized. Optional OAuth, Sentry and volunteer assignment are explicitly not represented as implemented. Seeded accounts/data are not real organizations or verification proof.
+
+Further UI audit: forecast API supported category selection but dashboard fixed bakery; category selector now exposes all five categories. Socket reconnect now invalidates durable notification/claim/listing queries explicitly, so missed hints do not leave stale dashboard state after reconnect. OpenAPI route-method inventory check is committed as a regression, not only a one-time script.
