@@ -11,10 +11,13 @@ import 'leaflet/dist/leaflet.css';
 function Selection({ value, onChange, onCenter }) {
   const map = useMap();
   useMapEvents({
-    click: (e) => onChange({ lat: e.latlng.lat, lng: e.latlng.lng }),
+    click: (e) => {
+      const p = e.latlng.wrap();
+      onChange({ lat: Math.max(-90, Math.min(90, p.lat)), lng: p.lng });
+    },
     moveend: () => {
-      const p = map.getCenter();
-      onCenter({ lat: p.lat, lng: p.lng });
+      const p = map.getCenter().wrap();
+      onCenter({ lat: Math.max(-90, Math.min(90, p.lat)), lng: p.lng });
     },
   });
   const lat = value?.lat,
